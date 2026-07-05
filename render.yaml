@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: sammtech-kanban-api
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build && npx prisma migrate deploy
+    startCommand: npm run start:prod
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_EXPIRES_IN
+        value: 1d
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sammtech-kanban-db
+          property: connectionString
+
+databases:
+  - name: sammtech-kanban-db
+    plan: free
+    region: oregon
+    databaseName: kanban_db
+    user: kanban_user
