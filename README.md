@@ -1,247 +1,123 @@
-# SammTech Kanban Task Management API
+# SammTech AI OS
 
-A RESTful backend for a Kanban-style task management system, built for the **SammTech Ltd. Backend Internship take-home assignment**. Users can register, log in, create boards, organize columns, and manage tasks — including dragging tasks between columns with a fully transactional position/reorder engine.
+An original, voice-enabled productivity workspace built around the existing NestJS Kanban API. React provides the black-glass and neon-green workspace, Three.js renders Samm, and a separate Python service supplies explainable task assistance. PostgreSQL remains the source of truth and NestJS checks every write.
 
----
+No commercial AI API key is required. Lightweight intelligence uses deterministic algorithms and TF-IDF search; it does not provide the reasoning ability of an instruction model. Optional local models can be installed separately.
 
-## 1. Tech Stack
+## What is implemented
 
-| Layer          | Choice                                   |
-|----------------|-------------------------------------------|
-| Framework      | NestJS 10 (TypeScript)                    |
-| Database       | PostgreSQL                                |
-| ORM            | Prisma 5                                  |
-| Auth           | JWT (Passport) + bcryptjs password hashing |
-| Validation     | class-validator / class-transformer       |
-| Docs           | Swagger / OpenAPI (`@nestjs/swagger`)     |
-| Security       | Helmet, CORS, `@nestjs/throttler` rate limiting |
+- JWT registration/login, per-user boards, five default columns, priorities, deadlines, task estimates, emoji labels, checklists, comments and task dependencies.
+- Transactional task creation, deletion and reordering, including concurrent requests; soft-deleted boards cannot be used for new task actions.
+- Dashboard, Kanban projects, AI assistant, voice workspace, agent center, command center, automations, planner, analytics, text files and device preferences.
+- An original procedural 3D robot with an event-driven state machine, reduced motion and a lightweight fallback.
+- Typed or spoken requests → Python interpretation → editable draft → explicit approval → authorized NestJS transaction → PostgreSQL → refreshed board and audit history.
+- Browser speech recognition where supported, browser speech synthesis, microphone stop/cancel/mute, and optional local Whisper/Piper adapters. Browser recognition may use the browser vendor's service. Application recordings are not retained.
+- Seven bounded, cancellable agent roles operating on authorized project data. The research role searches project tasks; it does not claim to browse the web.
+- Saved automation rules, conditions, owner, enable/disable controls and execution history. Available actions create reports or approved recurring tasks; they do not run shell commands or send external notifications.
+- Analytics derived from saved tasks and execution records, plus API/database/Python availability checks.
+- Safe JSON task import/export and small text notes. Binary file storage is not implemented.
 
-## 2. Features
+## Architecture
 
-- Register / login with hashed passwords and JWT access tokens
-- Boards → Columns → Tasks hierarchy, scoped strictly to the owning user
-- New boards auto-seed the 5 standard columns (Backlog, Todo, In Progress, Review, Done)
-- Soft delete for boards and tasks (`deletedAt`), hard delete for columns
-- Transactional task move/reorder endpoint (same-column reorder or cross-column transfer)
-- Search tasks by title, filter by priority and due date
-- Ownership enforcement on every mutation (`403` vs `404` handled distinctly)
-- Global validation, consistent JSON error shape, Helmet, CORS, and rate-limited auth routes
-- Full Swagger docs with bearer-token auth at `/api/docs`
-
-## 3. Folder Structure
-
-```
-sammtech-kanban-api/
-├── prisma/
-│   ├── schema.prisma        # User, Board, Column, Task, TaskLabel + Priority enum
-│   └── seed.ts              # optional demo data
-├── src/
-│   ├── auth/                # register, login, JWT strategy/guard
-│   │   ├── dto/
-│   │   ├── guards/
-│   │   └── strategies/
-│   ├── users/                # internal user data access (no public routes)
-│   ├── boards/                # board CRUD + default column seeding
-│   ├── columns/              # column CRUD
-│   ├── tasks/                # task CRUD + move/reorder engine
-│   ├── prisma/                # PrismaService/PrismaModule (global)
-│   ├── common/
-│   │   ├── decorators/       # @CurrentUser()
-│   │   ├── filters/          # global HTTP exception filter
-│   │   └── types/             # JwtPayload / AuthenticatedUser
-│   ├── app.module.ts
-│   ├── app.controller.ts     # GET / health check
-│   └── main.ts               # bootstrap: helmet, CORS, validation, Swagger
-├── .env.example
-├── render.yaml
-└── package.json
+```mermaid
+flowchart LR
+  Browser[React + Vite on Vercel] -->|JWT + validated requests| API[NestJS API]
+  API -->|owner-scoped transactions| DB[(PostgreSQL + Prisma)]
+  API -->|private service key + bounded data| Python[FastAPI intelligence]
+  Python --> Optional[Optional local model / speech]
+  Python -->|drafts and explanations| API
 ```
 
-## 4. Environment Variables
+| Directory | Responsibility |
+| --- | --- |
+| `src/` | Existing NestJS API plus workspace gateway, agents, automations and audit events |
+| `prisma/` | PostgreSQL schema, original baseline and reviewed additive migrations |
+| `frontend/` | React/TypeScript, Tailwind, shadcn-style button, R3F/Drei, Motion, Query, Zustand, dnd-kit and Recharts |
+| `ai-engine/` | Python 3.12/FastAPI, NumPy, scikit-learn and optional local inference/speech adapters |
+| `test/` and `frontend/tests/` | Backend regression/integration tests and browser acceptance tests |
+| `scripts/` | Safe migration startup and isolated migration verification |
+| `docs/` | Deployment, migration, local Windows and security details |
 
-Copy `.env.example` to `.env` and fill in real values — **never commit `.env`**.
+## Local setup
 
-| Variable          | Example                                                        | Notes                          |
-|-------------------|-----------------------------------------------------------------|---------------------------------|
-| `DATABASE_URL`    | `postgresql://username:password@localhost:5432/kanban_db`      | Your PostgreSQL connection string |
-| `JWT_SECRET`      | `your_jwt_secret_here`                                          | Use a long random string in production |
-| `JWT_EXPIRES_IN`  | `1d`                                                             | Any `ms`-compatible duration string |
-| `PORT`            | `5000`                                                           | Local port |
-| `NODE_ENV`        | `development`                                                    | `development` \| `production` |
-| `CORS_ORIGIN`     | `*`                                                               | Restrict to your frontend origin in production |
+Requirements: Node.js 22 LTS, npm, Python 3.12 and PostgreSQL 16. Docker Desktop is an optional way to run PostgreSQL. See [Windows setup](docs/LOCAL_WINDOWS.md) for PowerShell commands and optional local models.
 
-## 5. Setup & Run Locally
+1. Install dependencies:
 
-```bash
-# 1. Install dependencies (this also runs `prisma generate` via postinstall)
-npm install
+   ```sh
+   npm ci
+   npm --prefix frontend ci
+   python3.12 -m venv ai-engine/.venv
+   ai-engine/.venv/bin/python -m pip install --require-hashes -r ai-engine/requirements-dev.lock
+   ai-engine/.venv/bin/python -m pip install --no-deps -e ./ai-engine
+   ```
 
-# 2. Configure environment
-cp .env.example .env
-# edit .env with your real DATABASE_URL and a strong JWT_SECRET
+2. Copy `.env.example` to `.env` and replace the database password and the three secret placeholders. Set a random `JWT_SECRET`, a different random `AI_SERVICE_KEY`, and a different `SCHEDULER_SECRET`, each at least 32 characters. Keep them out of Git. The Python service receives the same `AI_SERVICE_KEY` as NestJS. A random secret can be generated locally with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+3. For a new local database, run `docker compose up -d database`. Set `DATABASE_URL` to that database. For an existing database, first read [safe migration instructions](docs/MIGRATIONS.md) and take a backup.
+4. Run migrations and compile:
 
-# 3. Run database migrations (creates tables from schema.prisma)
-npm run prisma:migrate
-# → prompts you to name the migration, e.g. "init"
+   ```sh
+   node scripts/migrate-safe.cjs
+   npm run build
+   ```
 
-# 4. (Optional) seed demo data — demo@sammtech.dev / Password123
-npm run seed
+5. Start the services in three terminals. The local Python launcher reads the shared service key from root `.env` and removes API/database secrets from its child environment:
 
-# 5. Start the dev server (watch mode)
-npm run start:dev
+   ```sh
+   # Repository root: Nest reads .env.
+   npm run start:dev
+   # Repository root: Python virtual environment must already be installed.
+   node scripts/run-ai.cjs
+   # Repository root: Vite proxies /api to port 5000.
+   npm --prefix frontend run dev
+   ```
+
+Open `http://localhost:5173`, create an account and create a board. Enter “Create a task called Fix Login Bug by tomorrow” in AI Assistant, review it, and approve it. The task appears only after the API confirms persistence. Refresh the browser to check it remains.
+
+Swagger is at `http://localhost:5000/api/docs`; liveness is `/`; database readiness is `/health/ready`. The authenticated `/workspace/health` endpoint includes Python availability.
+
+## Cloud deployment
+
+The frontend is prepared for **Vercel**, with its project Root Directory set to `frontend`. `frontend/vercel.json` builds Vite, enables SPA navigation and sets basic security headers. Set public build variable `VITE_API_URL` to the HTTPS NestJS API origin. Add the exact Vercel origin to the API's `CORS_ORIGIN` list. A configured frontend build does not establish that the API or database is live.
+
+`render.yaml` targets the existing `Samtech-kanban-api` service in Virginia and defines a separate lightweight Python web service. It deliberately does not provision or replace PostgreSQL. Supply the existing `DATABASE_URL` securely and follow the migration guide. Models are not downloaded as part of deployment. Read [deployment instructions](docs/DEPLOYMENT.md) before applying the Blueprint.
+
+Render free services sleep, have an ephemeral filesystem and share limited free instance hours. They cannot guarantee continuous background automation. Use an always-on worker or an authenticated external scheduler for dependable timing. Free PostgreSQL instances expire; choose a durable database and backups for valuable data. Details and current provider references are in the deployment guide.
+
+## Validation
+
+Run these checks after installation:
+
+```sh
+npm run build
+npm run lint
+npm test
+npm --prefix frontend run build
+ai-engine/.venv/bin/python -m pytest ai-engine/tests -q
+npm audit
+npm --prefix frontend audit
 ```
 
-The API listens on `http://localhost:5000` (or your `PORT`). Health check: `GET /`.
+Database tests require an isolated database named `sammtech_test`; they refuse another name. Set its `DATABASE_URL` and test-only `JWT_SECRET` in the process environment, then run:
 
-### Other useful scripts
-
-| Script                  | Purpose                                    |
-|--------------------------|---------------------------------------------|
-| `npm run build`          | Compile TypeScript to `dist/`               |
-| `npm run start:prod`     | Run the compiled build (`dist/main.js`)     |
-| `npm run prisma:studio`  | Open Prisma Studio (visual DB browser)      |
-| `npm run prisma:deploy`  | Apply migrations in production (no prompts) |
-| `npm run lint`           | ESLint with auto-fix                        |
-
-## 6. Swagger Docs
-
-Once running, open:
-
-```
-http://localhost:5000/api/docs
+```sh
+npx prisma migrate deploy
+npm run test:integration
+node scripts/verify-migrations.cjs
 ```
 
-Click **Authorize**, paste a JWT from `POST /auth/login` (no `Bearer ` prefix needed — Swagger adds it), and every protected route becomes callable from the browser.
+The migration verifier creates and drops only its own randomly named schemas inside that test database. It checks clean installation, exact legacy baselining with data preservation, and refusal of unexpected schema drift. Never point integration tests at production.
 
-## 7. API Endpoints
+Browser acceptance testing uses the local frontend, API, Python and isolated PostgreSQL. See the Playwright configuration in `frontend/` for the available command and required local services. The CI workflow runs builds, Python tests, backend tests and migration checks with temporary PostgreSQL and test-only secrets; it does not deploy or access production credentials.
 
-**Auth**
-| Method | Path             | Auth | Notes                        |
-|--------|------------------|------|-------------------------------|
-| POST   | `/auth/register` | —    | Create a user                |
-| POST   | `/auth/login`    | —    | Returns `{ accessToken, user }` |
+## Practical limits
 
-**Boards**
-| Method | Path           | Auth | Notes                                   |
-|--------|----------------|------|-------------------------------------------|
-| POST   | `/boards`      | ✅   | Creates board + 5 default columns        |
-| GET    | `/boards`      | ✅   | All boards owned by the caller           |
-| GET    | `/boards/:id`  | ✅   | Board with columns + tasks. Supports `?search=&priority=&dueDate=` |
-| DELETE | `/boards/:id`  | ✅   | Soft delete                              |
+- Lightweight NLP supports explicit English keywords and a limited set of date expressions, using UTC. Users review ambiguous requests and proposed deadlines.
+- Semantic search is optional and needs a separately installed local embedding model. The default search is lexical TF-IDF.
+- Instruction models, local Whisper and Piper require separately installed software and model assets. Their output quality and hardware speed vary; adapters require testing on the target machine. No Bangla support is claimed.
+- Voice playback starts from user interaction and depends on browser permissions/voices. Browser synthesis uses approximate mouth animation; local audio can drive mouth amplitude. Advanced phoneme lip synchronization is not provided.
+- Automations create workspace reports, not email/push notifications. Sleeping services may coalesce missed runs instead of replaying a backlog.
+- Current completion trends use each task's present completion timestamp. Existing Done tasks get an approximate historic timestamp during migration; the chart is not a full immutable history of every status transition.
+- Local preferences stay on the device and JWT sessions stay in the browser tab. Account recovery, email verification, collaboration and distributed rate-limit storage are future work.
 
-**Columns**
-| Method | Path                        | Auth | Notes                |
-|--------|------------------------------|------|-----------------------|
-| POST   | `/boards/:boardId/columns`  | ✅   | Create column         |
-| PATCH  | `/columns/:id`               | ✅   | Update title / order  |
-| DELETE | `/columns/:id`               | ✅   | Hard delete (cascades to tasks) |
-
-**Tasks**
-| Method | Path                       | Auth | Notes                                             |
-|--------|-----------------------------|------|-----------------------------------------------------|
-| POST   | `/columns/:columnId/tasks` | ✅   | Create task                                        |
-| PATCH  | `/tasks/:id`                | ✅   | Update title/description/priority/dueDate/assignee |
-| DELETE | `/tasks/:id`                | ✅   | Soft delete                                        |
-| PATCH  | `/tasks/:id/position`       | ✅   | Move within/between columns — see below            |
-
-`PATCH /tasks/:id/position` body:
-```json
-{ "targetColumnId": "uuid-of-column", "newPosition": 1 }
-```
-Pass the task's **current** column id to just reorder within the same column.
-
-All protected routes require `Authorization: Bearer <token>`. Unauthorized → `401`. Wrong owner → `403`. Missing resource → `404`.
-
-## 8. Key Technical Decisions
-
-- **Default columns on board creation.** Every new board is seeded with Backlog / Todo / In Progress / Review / Done, matching the assignment's example columns, so a board is immediately usable without a separate setup step.
-- **Position as contiguous integers, not fractional keys.** Each column's tasks are numbered `0, 1, 2, …` with no gaps. Moving a task shifts every task between its old and new slot by one, inside a single Prisma interactive transaction (`$transaction`). This is simpler to reason about, debug, and display than fractional/sparse ordering, and for realistic column sizes the extra row updates are negligible. The whole shift-and-move sequence is atomic, so a failure mid-operation can't leave two tasks sharing a position.
-- **One endpoint owns position changes.** `PATCH /tasks/:id` intentionally excludes `columnId`/`position` — all column and ordering changes go through `PATCH /tasks/:id/position`. This keeps position bookkeeping in exactly one code path instead of two endpoints that could disagree.
-- **404 vs 403 is deliberate.** Every ownership check first looks the resource up by ID alone (→ `404` if it truly doesn't exist), then separately checks `board.userId === currentUser` (→ `403` if it exists but isn't theirs). This matches the assignment's explicit requirement to distinguish the two cases rather than returning `404` for both.
-- **Columns are hard-deleted; their tasks cascade with them.** Boards and tasks use soft delete (`deletedAt`) per the spec, but columns have no `deletedAt` field — deleting a column is permanent and (via the Prisma schema's `onDelete: Cascade`) removes its tasks too. The trade-off is documented here rather than silently relying on schema behavior: if you need to preserve a column's tasks, move them to another column first.
-- **`TaskLabel` is schema-only in this submission.** The model and relation exist (per the schema hint) so tasks can carry labels, but no dedicated label CRUD endpoints were built, since none were listed in the required endpoint list — see "What I'd improve" below.
-- **`bcryptjs` instead of `bcrypt`.** `bcryptjs` is a pure-JavaScript implementation with an identical API, so there's no native module to compile — one less thing that can break across different deployment environments (this was actually discovered the hard way while sandbox-testing this very build; see Challenges below).
-
-## 9. Challenges & How They Were Solved
-
-- **Reordering without corrupting positions.** The trickiest part of the spec. Solved by treating each column's task list as a contiguous `0..n-1` sequence and wrapping every shift + the final move inside one `prisma.$transaction`, so partial failures can't desync positions. Both the same-column and cross-column cases clamp the requested position into the valid range first.
-- **Distinguishing "not found" from "not yours."** Needed explicit two-step checks (fetch by ID, then compare `userId`) in every service, rather than folding the owner check into the `WHERE` clause, so `403` and `404` stay distinguishable as required.
-- **Native dependency build failures.** `bcrypt`'s native binding failed to compile in a restricted-network environment. Swapped to `bcryptjs`, which needs no compilation step at all — a safer default for varied hosting environments, including some free-tier build containers.
-- **Keeping columns and tasks consistent on delete.** Decided explicitly (see Key Technical Decisions) whether deleting a column should hard- or soft-cascade its tasks, rather than leaving the behavior as an accidental side effect of the schema.
-
-## 10. What I'd Improve With More Time
-
-- Dedicated CRUD endpoints for `TaskLabel` (create/attach/detach labels on a task)
-- Refresh tokens + logout/token revocation
-- A `PATCH /boards/:id` rename endpoint (not in the required list, but a natural gap)
-- Pagination on `GET /boards` and on tasks within a large board
-- A task activity log (who moved what, and when) — listed as a bonus differentiator
-- Integration tests (Jest + a test database) covering the move/reorder edge cases specifically
-- File attachments on tasks via Multer + cloud storage
-
-## 11. Deployment (Render free tier)
-
-This repo includes `render.yaml` for one-click Blueprint deployment.
-
-**Option A — Blueprint (fastest)**
-1. Push this repo to GitHub.
-2. In the Render dashboard: **New → Blueprint**, select the repo. Render reads `render.yaml` and provisions both the web service and a free PostgreSQL database automatically, wiring `DATABASE_URL` between them.
-3. Render runs `npm install && npm run build && npx prisma migrate deploy`, then starts the app with `npm run start:prod`.
-
-**Option B — Manual**
-1. **New → PostgreSQL** → create a free database, copy its **Internal Connection String**.
-2. **New → Web Service** → connect the repo.
-   - Build command: `npm install && npm run build && npx prisma migrate deploy`
-   - Start command: `npm run start:prod`
-3. Add environment variables: `DATABASE_URL` (from step 1), `JWT_SECRET` (generate a long random value), `JWT_EXPIRES_IN=1d`, `NODE_ENV=production`, `CORS_ORIGIN=*`.
-4. Deploy. Swagger will be live at `https://<your-service>.onrender.com/api/docs`.
-
-**Know the free-tier limits before you rely on them for review:**
-- The free web service spins down after 15 minutes of inactivity; the next request wakes it in roughly 30–60 seconds. If a reviewer's first request seems slow, that's why.
-- Render's **free PostgreSQL database expires 30 days after creation**, with a 14-day grace period to upgrade before it (and its data) is deleted. For a short internship review window this is fine, but don't treat it as a permanent home for the demo — recreate the database or upgrade if you need it to keep running past that window.
-- Free databases don't include backups, so don't store anything you can't afford to lose.
-
-*(Railway and Fly.io both work too, per the assignment's "any of these is fine" — Railway auto-detects the Nest app and needs the same three env vars plus a Postgres plugin; Fly.io needs `fly launch` + `fly postgres create` and a `fly.toml`, not included here since Render was the requested target.)*
-
-## 12. Testing Checklist
-
-- [ ] `POST /auth/register` → 201, no password in response
-- [ ] `POST /auth/register` with a duplicate email → 409
-- [ ] `POST /auth/login` with correct credentials → 200 + `accessToken`
-- [ ] `POST /auth/login` with wrong password → 401
-- [ ] `POST /boards` without a token → 401
-- [ ] `POST /boards` → 201, includes 5 default columns
-- [ ] `GET /boards` → only the caller's own boards
-- [ ] `GET /boards/:id` as a different user → 403
-- [ ] `GET /boards/:id` with a random UUID → 404
-- [ ] `GET /boards/:id?priority=HIGH&search=login` → filters applied
-- [ ] `POST /boards/:boardId/columns` → new column appended
-- [ ] `POST /columns/:columnId/tasks` → task created at end of column
-- [ ] `PATCH /tasks/:id/position` reordering within a column → positions stay contiguous
-- [ ] `PATCH /tasks/:id/position` moving across columns → removed cleanly from source, inserted cleanly into target
-- [ ] `DELETE /tasks/:id` then `GET /boards/:id` → deleted task no longer appears
-- [ ] `DELETE /boards/:id` then `GET /boards` → deleted board no longer appears
-- [ ] Swagger UI loads at `/api/docs` and "Authorize" works end-to-end
-
-## 13. Sample Usage (curl)
-
-```bash
-# Register
-curl -X POST http://localhost:5000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Ada Lovelace","email":"ada@example.com","password":"StrongPass123"}'
-
-# Login
-curl -X POST http://localhost:5000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"ada@example.com","password":"StrongPass123"}'
-# → { "accessToken": "...", "user": {...} }
-
-# Create a board (replace $TOKEN)
-curl -X POST http://localhost:5000/boards \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Product Launch Roadmap"}'
-```
-
-Or just use `/api/docs` — every endpoint above is documented there with a "Try it out" button.
+See [security review](docs/SECURITY.md), [safe migrations](docs/MIGRATIONS.md), [Vercel/Render deployment](docs/DEPLOYMENT.md) and [Windows/local AI setup](docs/LOCAL_WINDOWS.md).

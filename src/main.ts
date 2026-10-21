@@ -2,16 +2,22 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.use('/voice/transcribe', json({ limit: '6mb' }));
+  app.use(json({ limit: '128kb' }));
+  app.use(urlencoded({ extended: false, limit: '128kb' }));
 
+  app.enableShutdownHooks();
+  app.getHttpAdapter().getInstance().set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 0));
   app.use(helmet());
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true,
+    origin: (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',').map(s => s.trim()),
+    credentials: false,
   });
 
   app.useGlobalPipes(
@@ -19,16 +25,16 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      transformOptions: { enableImplicitConversion: true },
+      transformOptions: { enableImplicitConversion: false },
     }),
   );
 
   app.useGlobalFilters(new HttpExceptionFilter());
 
   const config = new DocumentBuilder()
-    .setTitle('SammTech Kanban Task Management API')
+    .setTitle('SammTech AI OS API')
     .setDescription(
-      'RESTful backend API for a Kanban-style task management system. Built for the SammTech Ltd. Backend Internship take-home assignment.',
+      'Authorized Kanban workspace, Python intelligence gateway, audit logs, agents and persistent automation.',
     )
     .setVersion('1.0')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
@@ -38,9 +44,7 @@ async function bootstrap() {
 
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
   await app.listen(port, '0.0.0.0');
-  // eslint-disable-next-line no-console
   console.log(`🚀 Server running on port ${port}`);
-  // eslint-disable-next-line no-console
   console.log(`📚 Swagger docs available at /api/docs`);
 }
-bootstrap();
+bootstrap().catch(() => { console.error('Startup failed. Verify database connectivity and required configuration.'); process.exitCode = 1; });

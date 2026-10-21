@@ -1,6 +1,12 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
@@ -22,6 +28,8 @@ export class AuthService {
    * from login, so no token is issued here.
    */
   async register(dto: RegisterDto) {
+    if (Buffer.byteLength(dto.password, 'utf8') > 72)
+      throw new BadRequestException('Password must be at most 72 UTF-8 bytes');
     const existingUser = await this.usersService.findByEmail(dto.email);
 
     if (existingUser) {
@@ -30,11 +38,17 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(dto.password, SALT_ROUNDS);
 
-    return this.usersService.create({
-      name: dto.name,
-      email: dto.email,
-      password: hashedPassword,
-    });
+    try {
+      return await this.usersService.create({
+        name: dto.name,
+        email: dto.email,
+        password: hashedPassword,
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')
+        throw new ConflictException('An account with this email already exists');
+      throw error;
+    }
   }
 
   /**
@@ -44,6 +58,8 @@ export class AuthService {
    * emails are registered.
    */
   async login(dto: LoginDto) {
+    if (Buffer.byteLength(dto.password, 'utf8') > 72)
+      throw new UnauthorizedException('Invalid email or password');
     const user = await this.usersService.findByEmail(dto.email);
 
     if (!user) {
@@ -74,7 +90,7 @@ export class AuthService {
     const payload = { sub: userId, email };
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '1d',
+      expiresIn: this.configService.get<number>('JWT_TTL_SECONDS') || 86400,
     });
   }
 }

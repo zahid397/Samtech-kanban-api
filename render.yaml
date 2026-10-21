@@ -1,29 +1,61 @@
+# Review docs/DEPLOYMENT.md before syncing this Blueprint with existing resources.
+# The existing PostgreSQL connection is supplied securely; no replacement DB is created.
 services:
   - type: web
-    name: sammtech-kanban-api
+    name: Samtech-kanban-api
     runtime: node
     plan: free
-    region: oregon
-    buildCommand: npm install && npm run build && npx prisma migrate deploy
-    startCommand: npm run start:prod
-    healthCheckPath: /
+    region: virginia
+    branch: main
+    buildCommand: npm ci --include=dev && npm run build
+    # Free services have no pre-deploy step. Baseline only an exact original schema; reject drift.
+    startCommand: node scripts/migrate-safe.cjs && node dist/main.js
+    healthCheckPath: /health/ready
     envVars:
+      - key: NODE_VERSION
+        value: "22"
       - key: NODE_ENV
         value: production
-      - key: JWT_EXPIRES_IN
-        value: 1d
+      - key: JWT_TTL_SECONDS
+        value: "86400"
       - key: JWT_SECRET
         generateValue: true
-      - key: CORS_ORIGIN
-        value: "*"
       - key: DATABASE_URL
-        fromDatabase:
-          name: sammtech-kanban-db
-          property: connectionString
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: AI_ENGINE_URL
+        sync: false
+      - key: AI_SERVICE_KEY
+        fromService:
+          type: web
+          name: sammtech-ai-engine
+          envVarKey: AI_SERVICE_KEY
+      - key: AUTOMATION_WORKER_ENABLED
+        value: "true"
+      - key: SCHEDULER_SECRET
+        generateValue: true
 
-databases:
-  - name: sammtech-kanban-db
+  - type: web
+    name: sammtech-ai-engine
+    runtime: python
     plan: free
-    region: oregon
-    databaseName: kanban_db
-    user: kanban_user
+    region: virginia
+    branch: main
+    rootDir: ai-engine
+    buildCommand: pip install --require-hashes -r requirements.lock && pip install --no-deps .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.14"
+      - key: AI_SERVICE_KEY
+        generateValue: true
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: OPENBLAS_NUM_THREADS
+        value: "1"
+      - key: TOKENIZERS_PARALLELISM
+        value: "false"

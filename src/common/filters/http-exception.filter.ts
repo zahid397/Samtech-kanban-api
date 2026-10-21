@@ -26,7 +26,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const exceptionResponse = exception instanceof HttpException ? exception.getResponse() : null;
 
-    const message =
+    const message = status >= 500 ? 'Internal server error' :
       exceptionResponse && typeof exceptionResponse === 'object' && 'message' in exceptionResponse
         ? (exceptionResponse as ErrorBody).message
         : exception instanceof Error
@@ -36,7 +36,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(
         `${request.method} ${request.url}`,
-        exception instanceof Error ? exception.stack : undefined,
+        exception instanceof Error ? exception.name : 'Unknown error',
       );
     }
 

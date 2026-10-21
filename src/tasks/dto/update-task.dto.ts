@@ -7,4 +7,4 @@ import { CreateTaskDto } from './create-task.dto';
  * (see MoveTaskDto) so that position bookkeeping always goes through the one
  * transactional code path. See README > Key Technical Decisions.
  */
-export class UpdateTaskDto extends PartialType(CreateTaskDto) {}
+export class UpdateTaskDto extends PartialType(CreateTaskDto, { skipNullProperties: false }) {}

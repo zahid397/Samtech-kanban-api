@@ -21,8 +21,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  audits        AuditLog[]
+  agentRuns     AgentRun[]
+  automations   AutomationRule[]
+  files         WorkspaceFile[]
   boards        Board[]
-  assignedTasks Task[]  @relation("TaskAssignee")
+  assignedTasks Task[]           @relation("TaskAssignee")
 
   @@map("users")
 }
@@ -48,6 +52,7 @@ model Column {
   id        String   @id @default(uuid())
   title     String
   order     Int
+  isDone    Boolean  @default(false)
   boardId   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -71,6 +76,13 @@ model Task {
   deletedAt   DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  completedAt     DateTime?
+  estimateMinutes Int              @default(60)
+  checklist       ChecklistItem[]
+  comments        Comment[]
+  dependencies    TaskDependency[] @relation("Dependent")
+  dependents      TaskDependency[] @relation("Prerequisite")
 
   column   Column      @relation(fields: [columnId], references: [id], onDelete: Cascade)
   assignee User?       @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
@@ -97,4 +109,115 @@ model TaskLabel {
 
   @@index([taskId])
   @@map("task_labels")
+}
+
+model ChecklistItem {
+  id     String  @id @default(uuid())
+  title  String
+  done   Boolean @default(false)
+  taskId String
+  task   Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  body      String
+  authorId  String
+  taskId    String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model TaskDependency {
+  taskId      String
+  dependsOnId String
+  task        Task   @relation("Dependent", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn   Task   @relation("Prerequisite", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, dependsOnId])
+  @@index([dependsOnId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  entityId  String?
+  details   Json     @default("{}")
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model AgentRun {
+  id         String    @id @default(uuid())
+  userId     String
+  agent      String
+  status     String    @default("running")
+  result     Json?
+  error      String?
+  createdAt  DateTime  @default(now())
+  finishedAt DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model AutomationRule {
+  id             String          @id @default(uuid())
+  userId         String
+  name           String
+  kind           String
+  enabled        Boolean         @default(true)
+  frequencyHours Int             @default(24)
+  config         Json            @default("{}")
+  nextRunAt      DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runs           AutomationRun[]
+
+  @@index([enabled, nextRunAt])
+  @@index([userId])
+}
+
+model AutomationRun {
+  id           String         @id @default(uuid())
+  ruleId       String
+  scheduledFor DateTime
+  status       String
+  result       Json?
+  error        String?
+  createdAt    DateTime       @default(now())
+  rule         AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, scheduledFor])
+}
+
+model WorkspaceFile {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AiProposal {
+  id        String    @id @default(uuid())
+  userId    String
+  boardId   String
+  result    Json
+  appliedAt DateTime?
+  taskIds   Json?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }

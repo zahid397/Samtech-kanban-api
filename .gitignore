@@ -1,6 +1,14 @@
 # compiled output
 /dist
-/node_modules
+node_modules
+frontend/dist
+.venv
+__pycache__
+.pytest_cache
+.vercel
+playwright-report
+test-results
+*.tsbuildinfo
 
 # Logs
 logs
