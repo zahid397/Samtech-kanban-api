@@ -1,6 +1,6 @@
 # SammTech AI OS implementation report
 
-Verified locally on 2026-10-21. This report distinguishes implemented code, completed checks and deployment work still pending.
+Local verification completed on 2026-10-21; hosted frontend verification completed on 2026-10-22. This report distinguishes implemented code, completed checks and production work still blocked.
 
 ## Implemented application
 
@@ -39,8 +39,9 @@ The existing NestJS, TypeScript, PostgreSQL, Prisma, JWT and Swagger architectur
 | Python locked dependency audit | No known vulnerabilities |
 | Backend npm audit | 0 vulnerabilities |
 | Frontend npm audit | 0 vulnerabilities |
-| Frontend production build | Passed; final mascot performance adjustment awaiting build |
+| Frontend production build | Passed, including the final mascot performance adjustment |
 | Final Playwright acceptance suite | 3 tests passed (45.5 seconds) |
+| Hosted Vercel smoke check | HTTP 200 on root and /workspace; login and original 3D canvas load; no JavaScript errors or desktop/mobile horizontal overflow |
 
 The database tests cover authorization isolation, concurrent task ordering, proposal approval idempotency, automation execution/failures, agent cancellation, JWT expiration and registration races. Migration tests verify a fresh database, exact legacy baselining with preserved records, and refusal of unexpected schema drift without mutation. They use a disposable local database; they do not establish production database health.
 
@@ -54,10 +55,13 @@ Owner checks, typed inputs, transaction locks, safe error responses, exact-origi
 
 ## Deployment status
 
-- **Vercel frontend:** configuration is complete; deployment and hosted verification are pending. Set the project root to `frontend` and the public `VITE_API_URL` to the intended API origin.
-- **Render API:** production remains unhealthy. Inspection found an unreachable configured Neon endpoint that is absent from the connected Neon account. Restoring the intended database connection remains unresolved.
+- **Vercel frontend:** deployed directly from the verified local source and confirmed `READY`. Public production URL: https://sammtech-ai-os.vercel.app. Project: `prj_2L16ILkHcy2vYKZfkqGQsE9wGkxT`; deployment: `dpl_6K6wDmK9b4EerGHnrvu45xwFi8np`; application source commit: `b1149b1cbb2be286484dd4bc60d1812be637eecd`. Root directory is `frontend`, Node is 22.x, and `VITE_API_URL` points to the existing Render API. Hosted login, 3D loading, security headers and SPA routing were checked. This does not establish successful production login or task storage.
+- **GitHub publication:** source is committed on local branch `codex/sammtech-ai-os`. Both Git push and the connected GitHub branch API returned HTTP 403, including after the reported access update. The branch was not published and no PR was created. Vercel used a direct source deployment; Git auto-deployment is not connected yet.
+- **Render API:** production remains unhealthy. Inspection found an unreachable configured Neon endpoint that is absent from the connected Neon account. Restoring the intended database connection remains unresolved. A fresh public `/health/ready` request timed out after 25 seconds on 2026-10-22.
 - **Production database:** no replacement, destructive operation or production migration was performed. Existing data must remain untouched while the intended connection is restored.
 - **Python cloud service:** deployment configuration is provided; no healthy production Python deployment is claimed.
+
+Vercel project protection settings remain unchanged. Automatic approval review rejected the attempted removal of default SSO protection. The standard production alias was subsequently verified as publicly reachable without that change. The connector could inspect deployment state, but build-log and authenticated-fetch requests returned scope permission errors; no protected deployment access is claimed.
 
 The repository includes corrected Render build/start commands and readiness configuration. These files alone do not update an existing manually configured Render service. After restoring database access, follow [DEPLOYMENT.md](DEPLOYMENT.md), verify a backup/staging migration, configure the shared AI secret and exact Vercel CORS origin, and run the acceptance workflow against the deployed services.
 

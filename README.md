@@ -78,6 +78,8 @@ Swagger is at `http://localhost:5000/api/docs`; liveness is `/`; database readin
 
 ## Cloud deployment
 
+Frontend: https://sammtech-ai-os.vercel.app — deployed and browser-checked. The existing Render API still needs its database connection restored; production login and saved tasks are not yet verified. See the [implementation report](docs/IMPLEMENTATION_REPORT.md) for exact test results and release blockers.
+
 The frontend is prepared for **Vercel**, with its project Root Directory set to `frontend`. `frontend/vercel.json` builds Vite, enables SPA navigation and sets basic security headers. Set public build variable `VITE_API_URL` to the HTTPS NestJS API origin. Add the exact Vercel origin to the API's `CORS_ORIGIN` list. A configured frontend build does not establish that the API or database is live.
 
 `render.yaml` targets the existing `Samtech-kanban-api` service in Virginia and defines a separate lightweight Python web service. It deliberately does not provision or replace PostgreSQL. Supply the existing `DATABASE_URL` securely and follow the migration guide. Models are not downloaded as part of deployment. Read [deployment instructions](docs/DEPLOYMENT.md) before applying the Blueprint.

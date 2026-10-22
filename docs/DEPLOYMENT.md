@@ -10,6 +10,8 @@ No resource creation, paid upgrade or database replacement is implied by this fi
 
 ## Vercel: frontend
 
+Current verified frontend: https://sammtech-ai-os.vercel.app (`READY`, deployment `dpl_6K6wDmK9b4EerGHnrvu45xwFi8np`). It was uploaded directly from local commit `b1149b1cbb2be286484dd4bc60d1812be637eecd` because GitHub write requests returned HTTP 403. The production API/database remains unavailable; see [implementation report](IMPLEMENTATION_REPORT.md). Add `https://sammtech-ai-os.vercel.app` to API CORS when restoring the backend.
+
 1. Import `zahid397/Samtech-kanban-api` into the intended Vercel account/team, or update its existing matching project.
 2. Set **Root Directory** to `frontend`, **Framework Preset** to Vite, **Node.js** to 22.x, **Install Command** to `npm ci`, **Build Command** to `npm run build`, and **Output Directory** to `dist`. Root Directory is a project setting, not a `vercel.json` field.
 3. Set `VITE_API_URL=https://samtech-kanban-api.onrender.com` in the intended preview/production environment before building. It is public frontend configuration. Never set `JWT_SECRET`, `DATABASE_URL`, `AI_SERVICE_KEY` or `SCHEDULER_SECRET` as `VITE_` variables.
