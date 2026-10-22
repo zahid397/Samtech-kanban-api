@@ -30,18 +30,20 @@ export function Empty({
   title,
   children,
   action,
+  icon,
+  text,
 }: {
   title: string;
   children?: ReactNode;
   action?: ReactNode;
+  icon?: ReactNode;
+  text?: string;
 }) {
   return (
     <div className="empty">
-      <div className="empty-icon">
-        <Sparkles size={26} />
-      </div>
+      <div className="empty-icon">{icon || <Sparkles size={26} />}</div>
       <h3>{title}</h3>
-      <p>{children}</p>
+      <p>{children || text}</p>
       {action}
     </div>
   );

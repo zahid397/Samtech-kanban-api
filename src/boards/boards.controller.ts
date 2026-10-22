@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -16,6 +17,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../common/types/jwt-payload.interface';
 import { BoardsService } from './boards.service';
 import { CreateBoardDto } from './dto/create-board.dto';
+import { UpdateBoardDto } from './dto/update-board.dto';
 import { QueryTaskDto } from '../tasks/dto/query-task.dto';
 
 @ApiTags('Boards')
@@ -45,6 +47,16 @@ export class BoardsController {
     @Query() query: QueryTaskDto,
   ) {
     return this.boardsService.findOne(user.userId, id, query);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Rename an owned active board' })
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateBoardDto,
+  ) {
+    return this.boardsService.update(user.userId, id, dto);
   }
 
   @Delete(':id')

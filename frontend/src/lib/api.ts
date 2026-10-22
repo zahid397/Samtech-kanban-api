@@ -5,7 +5,7 @@ export const queryClient = new QueryClient({
 });
 interface Session {
   token: string;
-  user: { name: string; email: string };
+  user: { id?: string; name: string; email: string };
   set: (token: string, user: Session['user']) => void;
   logout: () => void;
 }
@@ -24,6 +24,13 @@ export const useSession = create<Session>((set) => ({
   },
   logout: () => {
     sessionStorage.removeItem('sammtech-session');
+    for (const key of Object.keys(sessionStorage)) {
+      if (
+        key.startsWith('sammtech-conversation:') ||
+        key.startsWith('sammtech-notifications-read:')
+      )
+        sessionStorage.removeItem(key);
+    }
     queryClient.clear();
     set({ token: '', user: { name: '', email: '' } });
   },
@@ -60,6 +67,8 @@ export async function api<T = unknown>(
   }
   const data = await response.json().catch(() => ({ message: 'Unexpected server response' }));
   if (!response.ok) {
+    if (response.status === 429)
+      throw new Error('Too many requests. Please wait a minute and try again.');
     if (response.status === 401 && token) useSession.getState().logout();
     throw new Error(
       Array.isArray(data.message)

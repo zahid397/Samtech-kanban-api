@@ -10,10 +10,12 @@ No resource creation, paid upgrade or database replacement is implied by this fi
 
 ## Vercel: frontend
 
-Current verified frontend: https://sammtech-ai-os.vercel.app (`READY`, deployment `dpl_6K6wDmK9b4EerGHnrvu45xwFi8np`). It was uploaded directly from local commit `b1149b1cbb2be286484dd4bc60d1812be637eecd` because GitHub write requests returned HTTP 403. The production API/database remains unavailable; see [implementation report](IMPLEMENTATION_REPORT.md). Add `https://sammtech-ai-os.vercel.app` to API CORS when restoring the backend.
+The earlier frontend https://sammtech-ai-os.vercel.app was verified `READY` at deployment `dpl_6K6wDmK9b4EerGHnrvu45xwFi8np`, from commit `b1149b1cbb2be286484dd4bc60d1812be637eecd`. **The latest check on 2026-10-22 returns HTTP 404 `DEPLOYMENT_NOT_FOUND`; that historical success is not current availability.** Existing project/team requests return HTTP 403 for missing team authorization. Restore access to the existing project before redeploying; do not create a duplicate as a workaround. GitHub write access now works.
+
+The legacy Render API is live and its canonical `/api/docs` page rendered successfully. The expanded workspace API and Python service still need deployment; see [implementation report](IMPLEMENTATION_REPORT.md). Add the final verified frontend origin to API CORS when releasing.
 
 1. Import `zahid397/Samtech-kanban-api` into the intended Vercel account/team, or update its existing matching project.
-2. Set **Root Directory** to `frontend`, **Framework Preset** to Vite, **Node.js** to 22.x, **Install Command** to `npm ci`, **Build Command** to `npm run build`, and **Output Directory** to `dist`. Root Directory is a project setting, not a `vercel.json` field.
+2. Set **Root Directory** to `frontend`, **Framework Preset** to Vite, **Node.js** to 24.x (24.22.1 or newer patched 24.x), **Install Command** to `npm ci`, **Build Command** to `npm run build`, and **Output Directory** to `dist`. Root Directory is a project setting, not a `vercel.json` field.
 3. Set `VITE_API_URL=https://samtech-kanban-api.onrender.com` in the intended preview/production environment before building. It is public frontend configuration. Never set `JWT_SECRET`, `DATABASE_URL`, `AI_SERVICE_KEY` or `SCHEDULER_SECRET` as `VITE_` variables.
 4. Add the exact frontend origin, without a trailing slash, to the API's comma-separated `CORS_ORIGIN`. Add specific preview origins deliberately; wildcard CORS origins are rejected.
 5. Build and inspect the resulting deployment. Verify HTTPS, login, board loading, draft approval, task persistence after refresh, microphone permissions, and mobile navigation before reporting the full application live.
@@ -29,7 +31,7 @@ The Blueprint keeps the existing service name and region. Before syncing it, ver
 | Setting | Value |
 | --- | --- |
 | Root Directory | repository root |
-| Runtime / Node | Node.js / 22 |
+| Runtime / Node | Node.js / 24.22.1 |
 | Build | `npm ci --include=dev && npm run build` |
 | Start | `node scripts/migrate-safe.cjs && node dist/main.js` |
 | Health check | `/health/ready` |

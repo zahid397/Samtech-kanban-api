@@ -8,9 +8,12 @@ No commercial AI API key is required. Lightweight intelligence uses deterministi
 
 - JWT registration/login, per-user boards, five default columns, priorities, deadlines, task estimates, emoji labels, checklists, comments and task dependencies.
 - Transactional task creation, deletion and reordering, including concurrent requests; soft-deleted boards cannot be used for new task actions.
-- Dashboard, Kanban projects, AI assistant, voice workspace, agent center, command center, automations, planner, analytics, text files and device preferences.
+- Dashboard, project overview, Kanban, task details, AI assistant, voice workspace, agents, command center, automations, planner, calendar, derived notifications, analytics, text files, profile and light/dark settings.
+- Custom column creation/renaming/reordering/deletion, sorting, personal task assignment and archived task restoration. Filtered or sorted lists cannot change manual task ordering by dragging.
+- Starter preview status, backend-derived usage/entitlements and confirmed plan-interest records. Pro/Enterprise prices are unannounced; billing, shared membership and administrator activation are not configured.
 - An original procedural 3D robot with an event-driven state machine, reduced motion and a lightweight fallback.
-- Typed or spoken requests → Python interpretation → editable draft → explicit approval → authorized NestJS transaction → PostgreSQL → refreshed board and audit history.
+- Typed or spoken requests → Python interpretation or named workspace commands → editable draft/review → explicit approval button → authorized NestJS transaction → PostgreSQL → refreshed board and audit history. Recognized “yes” alone never authorizes a write.
+- Samm appears in the assistant workspace, with listening/thinking/speaking states, Stop speaking, push-to-talk, a local microphone meter, honest browser activity indicators and bounded per-account conversation history. Signing out clears tab transcripts; recordings are not retained.
 - Browser speech recognition where supported, browser speech synthesis, microphone stop/cancel/mute, and optional local Whisper/Piper adapters. Browser recognition may use the browser vendor's service. Application recordings are not retained.
 - Seven bounded, cancellable agent roles operating on authorized project data. The research role searches project tasks; it does not claim to browse the web.
 - Saved automation rules, conditions, owner, enable/disable controls and execution history. Available actions create reports or approved recurring tasks; they do not run shell commands or send external notifications.
@@ -40,7 +43,7 @@ flowchart LR
 
 ## Local setup
 
-Requirements: Node.js 22 LTS, npm, Python 3.12 and PostgreSQL 16. Docker Desktop is an optional way to run PostgreSQL. See [Windows setup](docs/LOCAL_WINDOWS.md) for PowerShell commands and optional local models.
+Requirements: patched Node.js 24.22.1 (or 22.23.4+ in the supported 22.x line), npm, Python 3.12 and PostgreSQL 16+. Use `.nvmrc`; dependency installation rejects unpatched supported runtimes. Docker Desktop is an optional way to run PostgreSQL. See [Windows setup](docs/LOCAL_WINDOWS.md) for PowerShell commands and optional local models.
 
 1. Install dependencies:
 
@@ -78,7 +81,7 @@ Swagger is at `http://localhost:5000/api/docs`; liveness is `/`; database readin
 
 ## Cloud deployment
 
-Frontend: https://sammtech-ai-os.vercel.app — deployed and browser-checked. The existing Render API still needs its database connection restored; production login and saved tasks are not yet verified. See the [implementation report](docs/IMPLEMENTATION_REPORT.md) for exact test results and release blockers.
+The earlier frontend at https://sammtech-ai-os.vercel.app was deployed and browser-checked, but the latest live check now returns HTTP 404 `DEPLOYMENT_NOT_FOUND`. Access to its existing Vercel team/project must be restored before release. Render has a live legacy API and verified `/api/docs` UI. The latest full-stack recovery changes need deployment and production acceptance checks. See the [implementation report](docs/IMPLEMENTATION_REPORT.md) for exact test results and release blockers.
 
 The frontend is prepared for **Vercel**, with its project Root Directory set to `frontend`. `frontend/vercel.json` builds Vite, enables SPA navigation and sets basic security headers. Set public build variable `VITE_API_URL` to the HTTPS NestJS API origin. Add the exact Vercel origin to the API's `CORS_ORIGIN` list. A configured frontend build does not establish that the API or database is live.
 
@@ -88,7 +91,7 @@ Render free services sleep, have an ephemeral filesystem and share limited free 
 
 ## Validation
 
-Run these checks after installation:
+Use `npm run verify` for the unified build/unit/audit checks, or `npm run verify:all` with an isolated `sammtech_test` database for the managed full browser workflow. See [TESTING.md](docs/TESTING.md). Individual checks remain available:
 
 ```sh
 npm run build

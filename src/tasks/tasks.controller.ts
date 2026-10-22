@@ -1,5 +1,5 @@
 import { CommentDto, DependencyDto } from './dto/task-detail.dto';
-import { Body, Controller, Delete, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -16,12 +16,38 @@ import { MoveTaskDto } from './dto/move-task.dto';
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
+  @Get('tasks/archived')
+  @ApiOperation({ summary: 'Read up to 200 recently archived tasks owned by the current account' })
+  archived(@CurrentUser() user: AuthenticatedUser) {
+    return this.tasksService.archived(user.userId);
+  }
+
+  @Post('tasks/:id/restore')
+  @ApiOperation({ summary: 'Restore an archived task at the end of its column' })
+  restore(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.tasksService.restore(user.userId, id);
+  }
+
   @Post('tasks/:id/comments')
-  comment(@CurrentUser() u: AuthenticatedUser, @Param('id') id:string, @Body() d:CommentDto){return this.tasksService.comment(u.userId,id,d.body);}
+  comment(@CurrentUser() u: AuthenticatedUser, @Param('id') id: string, @Body() d: CommentDto) {
+    return this.tasksService.comment(u.userId, id, d.body);
+  }
   @Post('tasks/:id/dependencies')
-  dependency(@CurrentUser() u:AuthenticatedUser,@Param('id') id:string,@Body() d:DependencyDto){return this.tasksService.dependency(u.userId,id,d.dependsOnId);}
+  dependency(
+    @CurrentUser() u: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() d: DependencyDto,
+  ) {
+    return this.tasksService.dependency(u.userId, id, d.dependsOnId);
+  }
   @Delete('tasks/:id/dependencies/:dependencyId')
-  removeDependency(@CurrentUser() u:AuthenticatedUser,@Param('id') id:string,@Param('dependencyId') dep:string){return this.tasksService.dependency(u.userId,id,dep,true);}
+  removeDependency(
+    @CurrentUser() u: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('dependencyId') dep: string,
+  ) {
+    return this.tasksService.dependency(u.userId, id, dep, true);
+  }
 
   @Post('columns/:columnId/tasks')
   @ApiOperation({ summary: 'Create a task inside a column' })

@@ -1,5 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api';
+import { create } from 'zustand';
+export const SAMM_GREETING =
+  "Hello! I'm Samm, your AI workspace assistant. How can I help you today?";
+export const useSpeechStatus = create<{
+  status: 'idle' | 'loading' | 'speaking' | 'error';
+  error: string;
+}>(() => ({ status: 'idle', error: '' }));
+export function voiceCapabilities() {
+  return {
+    recognition: Boolean(
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition,
+    ),
+    recording: Boolean(
+      typeof navigator.mediaDevices?.getUserMedia === 'function' && typeof MediaRecorder !== 'undefined',
+    ),
+    synthesis: 'speechSynthesis' in window,
+    secure: window.isSecureContext,
+  };
+}
 import { useMascot, usePreferences } from './store';
 let disposePlayback: (() => void) | undefined;
 let speechGeneration = 0;
@@ -10,12 +29,14 @@ export function stopSpeech() {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   useMascot.getState().setMouth(0);
   useMascot.getState().event('REST');
+  useSpeechStatus.setState({ status: 'idle', error: '' });
 }
 export async function speak(text: string) {
   if (!usePreferences.getState().voice) return;
   stopSpeech();
   const generation = speechGeneration;
   const state = useMascot.getState();
+  useSpeechStatus.setState({ status: 'loading', error: '' });
   if (usePreferences.getState().localVoice) {
     const controller = new AbortController();
     disposePlayback = () => controller.abort();
@@ -44,6 +65,7 @@ export async function speak(text: string) {
         if (generation === speechGeneration) {
           state.setMouth(0);
           state.event('REST');
+          useSpeechStatus.setState({ status: 'idle' });
         }
       };
       disposePlayback = cleanup;
@@ -54,9 +76,19 @@ export async function speak(text: string) {
       };
       audio.onplay = () => {
         state.event('SPEAK');
+        useSpeechStatus.setState({ status: 'speaking' });
         update();
       };
-      audio.onended = audio.onerror = cleanup;
+      audio.onended = cleanup;
+      audio.onerror = () => {
+        cleanup();
+        if (generation === speechGeneration)
+          useSpeechStatus.setState({
+            status: 'error',
+            error:
+              'The local speech audio could not be played. Try a browser voice or continue using text.',
+          });
+      };
       await context.resume();
       if (generation !== speechGeneration) {
         cleanup();
@@ -71,7 +103,14 @@ export async function speak(text: string) {
       // A configured local voice can fall back to an installed browser voice.
     }
   }
-  if (!('speechSynthesis' in window)) return;
+  if (!('speechSynthesis' in window)) {
+    useSpeechStatus.setState({
+      status: 'error',
+      error:
+        'Speech output is unavailable in this browser. Samm’s replies remain available as text.',
+    });
+    return;
+  }
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'en-US';
   utterance.rate = 0.96;
@@ -82,12 +121,14 @@ export async function speak(text: string) {
     if (generation === speechGeneration) {
       state.setMouth(0);
       state.event('REST');
+      useSpeechStatus.setState({ status: 'idle' });
     }
   };
   disposePlayback = cleanup;
   utterance.onstart = () => {
     if (generation !== speechGeneration) return;
     state.event('SPEAK');
+    useSpeechStatus.setState({ status: 'speaking' });
     state.setMouth(0.5);
     timer = setInterval(() => {
       const elapsed = performance.now() - lastBoundary;
@@ -99,12 +140,23 @@ export async function speak(text: string) {
     lastBoundary = performance.now();
     state.setMouth(0.85);
   };
-  utterance.onend = utterance.onerror = cleanup;
+  utterance.onend = cleanup;
+  utterance.onerror = (event) => {
+    cleanup();
+    if (generation === speechGeneration && !['canceled', 'interrupted'].includes(event.error))
+      useSpeechStatus.setState({
+        status: 'error',
+        error:
+          'Voice playback could not start. Try Say hello after interacting, check your installed browser voices, or continue using text.',
+      });
+  };
   window.speechSynthesis.speak(utterance);
 }
 export function useVoice(onText: (text: string) => void) {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState('');
+  const [level, setLevel] = useState(0);
+  const meter = useRef<(() => void) | null>(null);
   const recognition = useRef<any>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -115,6 +167,9 @@ export function useVoice(onText: (text: string) => void) {
   const callback = useRef(onText);
   callback.current = onText;
   const release = () => {
+    meter.current?.();
+    meter.current = null;
+    setLevel(0);
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
     clearTimeout(deadline.current);
@@ -150,6 +205,10 @@ export function useVoice(onText: (text: string) => void) {
     setListening(true);
     try {
       if (usePreferences.getState().localVoice) {
+        if (!voiceCapabilities().recording)
+          throw new Error(
+            'Local microphone recording is unavailable here. Use an HTTPS page with microphone permissions, or type your request.',
+          );
         requestingPermission.current = true;
         const captured = await navigator.mediaDevices.getUserMedia({ audio: true });
         if (!active()) {
@@ -158,6 +217,34 @@ export function useVoice(onText: (text: string) => void) {
         }
         requestingPermission.current = false;
         stream.current = captured;
+        // Only the explicitly enabled local recorder exposes real microphone amplitude.
+        let meterContext: AudioContext | undefined;
+        try {
+          const context = new AudioContext();
+          meterContext = context;
+          const source = context.createMediaStreamSource(captured);
+          const analyser = context.createAnalyser();
+          analyser.fftSize = 256;
+          source.connect(analyser);
+          const samples = new Uint8Array(analyser.fftSize);
+          const timer = setInterval(() => {
+            analyser.getByteTimeDomainData(samples);
+            const rms = Math.sqrt(
+              samples.reduce((sum, sample) => sum + ((sample - 128) / 128) ** 2, 0) /
+                samples.length,
+            );
+            setLevel(Math.min(1, rms * 6));
+          }, 90);
+          meter.current = () => {
+            clearInterval(timer);
+            source.disconnect();
+            if (context.state !== 'closed') void context.close();
+          };
+          void context.resume();
+        } catch {
+          if (meterContext && meterContext.state !== 'closed') void meterContext.close();
+          /* Recording can work without an optional Web Audio meter. */
+        }
         const chunks: BlobPart[] = [];
         const rec = new MediaRecorder(captured);
         recorder.current = rec;
@@ -234,10 +321,16 @@ export function useVoice(onText: (text: string) => void) {
         requestingPermission.current = false;
         release();
         setListening(false);
-        setError((e as Error).message);
+        const message =
+          (e as Error).name === 'NotAllowedError'
+            ? 'Microphone permission was denied. Allow it in your browser’s site settings, then try again, or type below.'
+            : (e as Error).name === 'NotFoundError'
+              ? 'No microphone was found. Connect one or type your request.'
+              : (e as Error).message;
+        setError(message);
         event('FAIL');
       }
     }
   };
-  return { listening, error, start, stop, cancel };
+  return { listening, error, level, start, stop, cancel };
 }

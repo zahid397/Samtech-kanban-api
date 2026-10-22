@@ -21,20 +21,61 @@ function FrameSchedule() {
 function Creature() {
   const group = useRef<THREE.Group>(null);
   const eyes = useRef<THREE.Group>(null);
+  const head = useRef<THREE.Group>(null);
   const mouth = useRef<THREE.Mesh>(null);
   const antenna = useRef<THREE.Mesh>(null);
   const state = useMascot((s) => s.state);
   const reduced = usePreferences((s) => s.reducedMotion);
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     if (!group.current) return;
     const t = clock.elapsedTime;
     const sleeping = state === 'sleeping';
     if (!reduced) {
-      group.current.rotation.y = Math.sin(t * 0.5) * 0.16;
-      group.current.rotation.z = Math.sin(t * 0.7) * 0.035;
-      group.current.position.y = Math.sin(t * 1.7) * 0.07;
+      group.current.rotation.y = THREE.MathUtils.damp(
+        group.current.rotation.y,
+        Math.sin(t * 0.5) * 0.16,
+        7,
+        delta,
+      );
+      group.current.rotation.z = THREE.MathUtils.damp(
+        group.current.rotation.z,
+        Math.sin(t * 0.7) * 0.035,
+        7,
+        delta,
+      );
+      group.current.position.y = THREE.MathUtils.damp(
+        group.current.position.y,
+        Math.sin(t * 1.7) * 0.07,
+        7,
+        delta,
+      );
     }
-    if (eyes.current) eyes.current.scale.y = state === 'blinking' || sleeping ? 0.12 : 1;
+    if (head.current) {
+      head.current.rotation.z = THREE.MathUtils.damp(
+        head.current.rotation.z,
+        state === 'confused' ? 0.18 : state === 'happy' || state === 'completed' ? -0.07 : 0,
+        8,
+        delta,
+      );
+      head.current.rotation.y = reduced
+        ? 0
+        : Math.sin(t * 0.8) * (state === 'listening' ? 0.13 : 0.045);
+    }
+    if (eyes.current) {
+      eyes.current.scale.y = THREE.MathUtils.damp(
+        eyes.current.scale.y,
+        state === 'blinking' || sleeping
+          ? 0.12
+          : state === 'happy' || state === 'completed'
+            ? 0.65
+            : state === 'error'
+              ? 0.5
+              : 1,
+        35,
+        delta,
+      );
+      eyes.current.rotation.z = state === 'confused' ? -0.14 : 0;
+    }
     if (mouth.current) mouth.current.scale.x = 0.8;
     if (mouth.current)
       mouth.current.scale.y =
@@ -52,7 +93,14 @@ function Creature() {
             : 1,
       );
   });
-  const glow = state === 'error' ? '#ff857a' : state === 'thinking' ? '#b5a2ff' : '#bbff80';
+  const glow =
+    state === 'error'
+      ? '#ff857a'
+      : state === 'thinking'
+        ? '#b5a2ff'
+        : state === 'confused'
+          ? '#ffd782'
+          : '#bbff80';
   return (
     <Float
       speed={reduced ? 0 : 1.5}
@@ -60,42 +108,44 @@ function Creature() {
       floatIntensity={reduced ? 0 : 0.15}
     >
       <group ref={group} rotation={[0, -0.13, 0]} position={[0, 0.05, 0]}>
-        <RoundedBox
-          args={[1.75, 1.36, 1.08]}
-          radius={0.32}
-          smoothness={3}
-          position={[0, 0.55, 0]}
-          castShadow
-        >
-          <meshStandardMaterial color="#dce8d5" metalness={0.55} roughness={0.25} />
-        </RoundedBox>
-        <RoundedBox
-          args={[1.48, 0.88, 0.19]}
-          radius={0.23}
-          smoothness={3}
-          position={[0, 0.57, 0.55]}
-        >
-          <meshStandardMaterial color="#10201a" metalness={0.6} roughness={0.2} />
-        </RoundedBox>
-        <group ref={eyes} position={[0, 0.65, 0.67]}>
-          {[-0.34, 0.34].map((x) => (
-            <RoundedBox key={x} args={[0.15, 0.27, 0.035]} radius={0.065} position={[x, 0, 0]}>
-              <meshStandardMaterial color={glow} emissive={glow} emissiveIntensity={3} />
-            </RoundedBox>
-          ))}
+        <group ref={head}>
+          <RoundedBox
+            args={[1.75, 1.36, 1.08]}
+            radius={0.32}
+            smoothness={3}
+            position={[0, 0.55, 0]}
+            castShadow
+          >
+            <meshStandardMaterial color="#dce8d5" metalness={0.55} roughness={0.25} />
+          </RoundedBox>
+          <RoundedBox
+            args={[1.48, 0.88, 0.19]}
+            radius={0.23}
+            smoothness={3}
+            position={[0, 0.57, 0.55]}
+          >
+            <meshStandardMaterial color="#10201a" metalness={0.6} roughness={0.2} />
+          </RoundedBox>
+          <group ref={eyes} position={[0, 0.65, 0.67]}>
+            {[-0.34, 0.34].map((x) => (
+              <RoundedBox key={x} args={[0.15, 0.27, 0.035]} radius={0.065} position={[x, 0, 0]}>
+                <meshStandardMaterial color={glow} emissive={glow} emissiveIntensity={3} />
+              </RoundedBox>
+            ))}
+          </group>
+          <mesh ref={mouth} position={[0, 0.34, 0.68]}>
+            <capsuleGeometry args={[0.045, 0.18, 4, 8]} />
+            <meshStandardMaterial color={glow} emissive={glow} emissiveIntensity={2} />
+          </mesh>
+          <mesh position={[0, 1.38, 0]}>
+            <cylinderGeometry args={[0.025, 0.025, 0.35, 12]} />
+            <meshStandardMaterial color="#77916c" />
+          </mesh>
+          <mesh ref={antenna} position={[0, 1.6, 0]}>
+            <sphereGeometry args={[0.1, 20, 20]} />
+            <meshStandardMaterial color={glow} emissive={glow} emissiveIntensity={3} />
+          </mesh>
         </group>
-        <mesh ref={mouth} position={[0, 0.34, 0.68]}>
-          <capsuleGeometry args={[0.045, 0.18, 4, 8]} />
-          <meshStandardMaterial color={glow} emissive={glow} emissiveIntensity={2} />
-        </mesh>
-        <mesh position={[0, 1.38, 0]}>
-          <cylinderGeometry args={[0.025, 0.025, 0.35, 12]} />
-          <meshStandardMaterial color="#77916c" />
-        </mesh>
-        <mesh ref={antenna} position={[0, 1.6, 0]}>
-          <sphereGeometry args={[0.1, 20, 20]} />
-          <meshStandardMaterial color={glow} emissive={glow} emissiveIntensity={3} />
-        </mesh>
         <RoundedBox args={[1.02, 0.8, 0.8]} radius={0.28} position={[0, -0.58, 0]} castShadow>
           <meshStandardMaterial color="#b4c5a9" metalness={0.5} roughness={0.32} />
         </RoundedBox>
@@ -123,6 +173,17 @@ export default function Mascot() {
   const low = usePreferences((s) => s.lowPerformance);
   const event = useMascot((s) => s.event);
   const state = useMascot((s) => s.state);
+  const reaction = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const react = () => {
+    const current = useMascot.getState().state;
+    if (!['idle', 'floating', 'blinking', 'happy', 'confused', 'completed'].includes(current))
+      return;
+    event('HAPPY');
+    clearTimeout(reaction.current);
+    reaction.current = setTimeout(() => {
+      if (useMascot.getState().state === 'happy') event('REST');
+    }, 1300);
+  };
   useEffect(() => {
     let blink: ReturnType<typeof setTimeout>;
     const timer = setInterval(() => {
@@ -137,22 +198,41 @@ export default function Mascot() {
     return () => {
       clearInterval(timer);
       clearTimeout(blink);
+      clearTimeout(reaction.current);
       document.removeEventListener('visibilitychange', visibility);
     };
   }, [event]);
   if (low)
     return (
-      <div className="mascot-fallback" role="img" aria-label={`Samm, your assistant, is ${state}`}>
+      <div
+        className="mascot-fallback"
+        role="img"
+        aria-label={`Samm, your assistant, is ${state}`}
+        onPointerEnter={react}
+      >
         <div className="robot-face">
           <i />
           <i />
           <span />
         </div>
         <small>SAMM · {state.toUpperCase()}</small>
+        <button
+          className="companion-react"
+          aria-label="Interact with Samm"
+          type="button"
+          onClick={react}
+        >
+          ✦
+        </button>
       </div>
     );
   return (
-    <div className="mascot-canvas" role="img" aria-label={`Animated 3D Samm robot, ${state}`}>
+    <div
+      className="mascot-canvas"
+      role="img"
+      aria-label={`Animated 3D Samm robot, ${state}`}
+      onPointerEnter={react}
+    >
       <Canvas
         frameloop="demand"
         dpr={[1, 1.5]}
@@ -175,6 +255,14 @@ export default function Mascot() {
           far={4}
         />
       </Canvas>
+      <button
+        className="companion-react"
+        aria-label="Interact with Samm"
+        type="button"
+        onClick={react}
+      >
+        ✦
+      </button>
     </div>
   );
 }

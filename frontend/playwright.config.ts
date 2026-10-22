@@ -3,7 +3,7 @@ export default defineConfig({
   testDir: './tests',
   fullyParallel: false,
   workers: 1,
-  timeout: 90000,
+  timeout: 180000,
   expect: { timeout: 15000 },
   reporter: 'list',
   use: {

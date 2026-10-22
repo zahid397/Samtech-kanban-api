@@ -29,7 +29,7 @@ import {
   Bar,
   CartesianGrid,
 } from 'recharts';
-import { api, refresh } from '../lib/api';
+import { api, refresh, useSession } from '../lib/api';
 import type { Workspace, AIResult, Board, AgentRun, Rule, Draft } from '../lib/types';
 import { Button } from '../components/ui/button';
 import { SectionTitle, ErrorMessage, Empty, Modal, CardTitle } from '../components/Primitives';
@@ -659,17 +659,15 @@ export function Files({ data, board }: { data: Workspace; board?: Board }) {
             : parsed.tasks;
         if (!Array.isArray(tasks)) throw new Error('Expected a task array or exported board');
         setPending(
-          tasks
-            .slice(0, 100)
-            .map((t: any) => ({
-              title: t.title,
-              description: t.description || '',
-              priority: t.priority || 'MEDIUM',
-              dueDate: t.dueDate || null,
-              estimateMinutes: t.estimateMinutes || 60,
-              labels: t.labels?.map((l: any) => ({ name: l.name, color: l.color })),
-              checklist: t.checklist?.map((c: any) => ({ title: c.title, done: c.done })),
-            })),
+          tasks.slice(0, 100).map((t: any) => ({
+            title: t.title,
+            description: t.description || '',
+            priority: t.priority || 'MEDIUM',
+            dueDate: t.dueDate || null,
+            estimateMinutes: t.estimateMinutes || 60,
+            labels: t.labels?.map((l: any) => ({ name: l.name, color: l.color })),
+            checklist: t.checklist?.map((c: any) => ({ title: c.title, done: c.done })),
+          })),
         );
       } else {
         await api('/files', 'POST', { name: file.name, content });
@@ -769,6 +767,7 @@ export function Files({ data, board }: { data: Workspace; board?: Board }) {
 }
 export function Settings() {
   const prefs = usePreferences();
+  const user = useSession((s) => s.user);
   return (
     <>
       <SectionTitle
@@ -776,7 +775,41 @@ export function Settings() {
         title="Your workspace, your way"
         description="Preferences are saved on this device."
       />
+      <section className="glass profile-panel" aria-labelledby="profile-heading">
+        <div className="profile-heading">
+          <span className="avatar">{user.name.slice(0, 1).toUpperCase()}</span>
+          <div>
+            <span className="eyebrow">SIGNED-IN ACCOUNT</span>
+            <h2 id="profile-heading">Your profile</h2>
+          </div>
+        </div>
+        <dl className="profile-details">
+          <div>
+            <dt>Name</dt>
+            <dd>{user.name}</dd>
+          </div>
+          <div>
+            <dt>Email address</dt>
+            <dd>{user.email}</dd>
+          </div>
+        </dl>
+      </section>
       <section className="glass settings-panel">
+        <div className="setting">
+          <div>
+            <h3>Appearance</h3>
+            <p>Choose your workspace lighting. Your choice stays on this device.</p>
+          </div>
+          <select
+            className="theme-select"
+            aria-label="Workspace appearance"
+            value={prefs.theme}
+            onChange={(e) => prefs.set({ theme: e.target.value as 'dark' | 'light' })}
+          >
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
         {[
           [
             'voice',
@@ -822,9 +855,7 @@ export function Settings() {
           variant="outline"
           onClick={() => {
             prefs.set({ voice: true });
-            void speak(
-              "Hello! Welcome back to SammTech AI. I'm your personal workspace assistant. What shall we build today?",
-            );
+            void speak("Hello! I'm Samm, your AI workspace assistant. How can I help you today?");
           }}
         >
           <Volume2 size={17} />

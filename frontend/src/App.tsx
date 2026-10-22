@@ -27,6 +27,11 @@ import {
   Command,
   Volume2,
   LoaderCircle,
+  Sun,
+  Moon,
+  Bell,
+  CreditCard,
+  FolderKanban,
 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { CardTitle, Empty, ErrorMessage, Loading } from './components/Primitives';
@@ -46,8 +51,15 @@ const Planner = lazy(() => Tools().then((m) => ({ default: m.Planner })));
 const Files = lazy(() => Tools().then((m) => ({ default: m.Files })));
 const Settings = lazy(() => Tools().then((m) => ({ default: m.Settings })));
 const CommandCenter = lazy(() => Tools().then((m) => ({ default: m.CommandCenter })));
+const Extras = () => import('./pages/WorkspaceExtras');
+const Projects = lazy(() => Extras().then((m) => ({ default: m.Projects })));
+const Calendar = lazy(() => Extras().then((m) => ({ default: m.Calendar })));
+const Notifications = lazy(() => Extras().then((m) => ({ default: m.Notifications })));
+const Team = lazy(() => Extras().then((m) => ({ default: m.Team })));
+const Subscription = lazy(() => Extras().then((m) => ({ default: m.Subscription })));
 const navigation = [
   ['Dashboard', LayoutDashboard],
+  ['Projects', FolderKanban],
   ['AI Assistant', Bot],
   ['Voice Workspace', Mic],
   ['AI Agents', Users],
@@ -55,8 +67,12 @@ const navigation = [
   ['Command Center', Terminal],
   ['Automations', Workflow],
   ['Smart Planner', CalendarDays],
+  ['Calendar', CalendarDays],
+  ['Team Workspace', Users],
+  ['Notifications', Bell],
   ['Analytics', ChartNoAxesCombined],
   ['Files', FolderOpen],
+  ['Subscription', CreditCard],
   ['Settings', SettingsIcon],
 ] as const;
 class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -183,7 +199,7 @@ function Auth() {
               useMascot.getState().event('HAPPY');
               if (usePreferences.getState().voice)
                 void speak(
-                  "Hello! Welcome back to SammTech AI. I'm your personal workspace assistant. What shall we build today?",
+                  "Hello! I'm Samm, your AI workspace assistant. How can I help you today?",
                 );
             } catch (err) {
               setError((err as Error).message);
@@ -321,7 +337,7 @@ function Dashboard({ data, navigate }: { data: Workspace; navigate: (s: string) 
               onClick={() => {
                 prefs.set({ voice: true });
                 void speak(
-                  "Hello! Welcome back to SammTech AI. I'm your personal workspace assistant. What shall we build today?",
+                  "Hello! I'm Samm, your AI workspace assistant. How can I help you today?",
                 );
               }}
             >
@@ -497,13 +513,18 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('reduce-motion', prefs.reducedMotion);
   }, [prefs.reducedMotion]);
+  useEffect(() => {
+    document.documentElement.dataset.theme = prefs.theme;
+  }, [prefs.theme]);
   if (!session.token)
     return (
       <MotionConfig reducedMotion={prefs.reducedMotion ? 'always' : 'user'}>
         <Auth />
       </MotionConfig>
     );
-  const navigate = (s: string) => {
+  const navigate = (s: string, query?: string, targetBoardId?: string) => {
+    if (query !== undefined) setFilter(query);
+    if (targetBoardId) setBoardId(targetBoardId);
     setPage(s);
     setSidebar(false);
   };
@@ -536,7 +557,7 @@ export default function App() {
           </div>
           <span className="nav-label">WORKSPACE</span>
           <nav aria-label="Main navigation">
-            {navigation.map(([name, Icon], i) => (
+            {navigation.map(([name, Icon]) => (
               <button
                 key={name}
                 aria-label={name}
@@ -546,7 +567,9 @@ export default function App() {
                 <Icon size={17} />
                 <span>{name}</span>
                 {name === 'AI Assistant' && <span className="nav-badge">AI</span>}
-                {i === 4 && data && <span className="nav-count">{data.boards.length}</span>}
+                {name === 'Kanban Projects' && data && (
+                  <span className="nav-count">{data.boards.length}</span>
+                )}
               </button>
             ))}
           </nav>
@@ -618,7 +641,20 @@ export default function App() {
                   ? 'Syncing'
                   : 'Workspace connected'}
             </span>
-            <span className="avatar small">{session.user.name.slice(0, 1).toUpperCase()}</span>
+            <button
+              className="icon-button theme-toggle"
+              aria-label={prefs.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              onClick={() => prefs.set({ theme: prefs.theme === 'dark' ? 'light' : 'dark' })}
+            >
+              {prefs.theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <button
+              className="avatar small"
+              aria-label="View profile"
+              onClick={() => navigate('Settings')}
+            >
+              {session.user.name.slice(0, 1).toUpperCase()}
+            </button>
           </header>
           <main id="main" className="main-content">
             {workspace.isLoading ? (
@@ -632,6 +668,16 @@ export default function App() {
               <Suspense fallback={<Loading />}>
                 {page === 'Dashboard' ? (
                   <Dashboard data={data} navigate={navigate} />
+                ) : page === 'Projects' ? (
+                  <Projects data={data} navigate={navigate} />
+                ) : page === 'Calendar' ? (
+                  <Calendar data={data} navigate={navigate} />
+                ) : page === 'Notifications' ? (
+                  <Notifications data={data} navigate={navigate} />
+                ) : page === 'Team Workspace' ? (
+                  <Team data={data} />
+                ) : page === 'Subscription' ? (
+                  <Subscription />
                 ) : page === 'Kanban Projects' ? (
                   <Kanban
                     data={data}
@@ -646,6 +692,7 @@ export default function App() {
                     data={data}
                     board={board}
                     voicePage={page === 'Voice Workspace'}
+                    onNavigate={navigate}
                   />
                 ) : page === 'AI Agents' ? (
                   <Agents data={data} board={board} />

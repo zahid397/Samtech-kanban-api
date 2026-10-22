@@ -5,6 +5,7 @@ export interface Draft {
   priority: Priority;
   dueDate?: string | null;
   estimateMinutes?: number;
+  assigneeId?: string | null;
   labels?: { name: string; color: string }[];
   checklist?: { title: string; done: boolean }[];
 }

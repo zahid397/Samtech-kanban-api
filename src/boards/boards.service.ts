@@ -3,6 +3,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBoardDto } from './dto/create-board.dto';
+import { UpdateBoardDto } from './dto/update-board.dto';
 import { QueryTaskDto } from '../tasks/dto/query-task.dto';
 
 // Every new board is seeded with these columns, matching the default Kanban
@@ -82,6 +83,21 @@ export class BoardsService {
           },
         },
       },
+    });
+  }
+
+  update(userId: string, boardId: string, dto: UpdateBoardDto) {
+    return this.prisma.write(userId, async (tx) => {
+      const board = await tx.board.findUnique({ where: { id: boardId } });
+      if (!board || board.deletedAt) throw new NotFoundException('Board not found');
+      if (board.userId !== userId)
+        throw new ForbiddenException('You do not have access to this board');
+      const updated = await tx.board.update({
+        where: { id: boardId },
+        data: { title: dto.title },
+      });
+      await audit(tx, userId, 'board.updated', boardId, { title: updated.title });
+      return updated;
     });
   }
 

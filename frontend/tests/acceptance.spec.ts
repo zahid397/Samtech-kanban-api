@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/test';
+const apiOrigin = process.env.E2E_API_URL || 'http://127.0.0.1:5000';
 
 test('login → original mascot → Python draft → approved save → refresh persistence', async ({
   page,
@@ -36,7 +37,7 @@ test('login → original mascot → Python draft → approved save → refresh p
   const session = await page.evaluate(() =>
     JSON.parse(sessionStorage.getItem('sammtech-session') || '{}'),
   );
-  const before = await request.get('http://127.0.0.1:5000/workspace', {
+  const before = await request.get(`${apiOrigin}/workspace`, {
     headers: { Authorization: `Bearer ${session.token}` },
   });
   expect((await before.json()).tasks).toHaveLength(0);
@@ -47,7 +48,7 @@ test('login → original mascot → Python draft → approved save → refresh p
   await page.reload();
   await page.getByRole('button', { name: 'Kanban Projects', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Fix Login Bug', exact: true })).toBeVisible();
-  const persisted = await request.get('http://127.0.0.1:5000/workspace', {
+  const persisted = await request.get(`${apiOrigin}/workspace`, {
     headers: { Authorization: `Bearer ${session.token}` },
   });
   const workspace = await persisted.json();

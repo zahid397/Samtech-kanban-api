@@ -65,8 +65,10 @@ export class ColumnsService {
       const column = await this.owned(tx, columnId, userId);
       // The same owner lock guards task creation, moves and deletion. A new task
       // cannot arrive between this check and the database cascade.
-      if (await tx.task.count({ where: { columnId, deletedAt: null } }))
-        throw new BadRequestException('Move or delete tasks before deleting this column');
+      if (await tx.task.count({ where: { columnId } }))
+        throw new BadRequestException(
+          'Move active tasks and restore archived task history before deleting this column',
+        );
       await tx.column.delete({ where: { id: columnId } });
       const remaining = await tx.column.findMany({
         where: { boardId: column.boardId },

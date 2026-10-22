@@ -2,7 +2,7 @@
 
 ## Useful without a model
 
-Install Node.js 22 LTS, Python 3.12 (including pip), Git, and either PostgreSQL 16 or Docker Desktop with WSL2. Use a current Chromium-based browser for browser speech recognition; recognition support varies and may depend on the browser vendor's online service.
+Install security-patched Node.js 24.22.1 (the project `.nvmrc` version), Python 3.12 (including pip), Git, and either PostgreSQL 16 or Docker Desktop with WSL2. Use a current Chromium-based browser for browser speech recognition; recognition support varies and may depend on the browser vendor's online service.
 
 A practical baseline is a 64-bit CPU with 4 cores, 8 GB system RAM and 3–5 GB free storage for the application, database, dependencies and browser. The lightweight Python process typically needs substantially less than a full model runtime, but measure its actual peak RAM with your workload. No GPU is required. The application remains usable with all model settings absent.
 

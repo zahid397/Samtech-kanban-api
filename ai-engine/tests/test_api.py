@@ -16,7 +16,7 @@ AUTH={'x-service-key':KEY}
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(main,'KEY',KEY)
-    for name in ['OLLAMA_MODEL','EMBEDDING_MODEL_PATH','WHISPER_MODEL_PATH','PIPER_MODEL_PATH']:
+    for name in ['AI_PROVIDER','NEON_AI_GATEWAY_BASE_URL','NEON_AI_GATEWAY_TOKEN','NEON_AI_GATEWAY_MODEL','OLLAMA_MODEL','EMBEDDING_MODEL_PATH','WHISPER_MODEL_PATH','PIPER_MODEL_PATH']:
         monkeypatch.delenv(name,raising=False)
     with TestClient(main.app) as client:
         yield client

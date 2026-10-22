@@ -106,6 +106,36 @@ export class TasksService {
       return { message: 'Task deleted successfully' };
     });
   }
+  archived(userId: string) {
+    return this.prisma.task.findMany({
+      where: { deletedAt: { not: null }, column: { board: { userId, deletedAt: null } } },
+      orderBy: { deletedAt: 'desc' },
+      take: 200,
+      include: {
+        ...taskDetails,
+        column: { select: { title: true, board: { select: { title: true } } } },
+      },
+    });
+  }
+  restore(userId: string, taskId: string) {
+    return this.prisma.write(userId, async (tx) => {
+      const task = await tx.task.findUnique({
+        where: { id: taskId },
+        include: { column: { include: { board: true } } },
+      });
+      if (!task || task.column.board.deletedAt) throw new NotFoundException('Task not found');
+      if (task.column.board.userId !== userId) throw new ForbiddenException('Task access denied');
+      if (!task.deletedAt) return task;
+      const position = await tx.task.count({ where: { columnId: task.columnId, deletedAt: null } });
+      const restored = await tx.task.update({
+        where: { id: taskId },
+        data: { deletedAt: null, position },
+        include: taskDetails,
+      });
+      await audit(tx, userId, 'task.restored', taskId);
+      return restored;
+    });
+  }
   move(userId: string, taskId: string, dto: MoveTaskDto) {
     return this.prisma.write(userId, async (tx) => {
       const task = await this.owned(tx, userId, taskId);
