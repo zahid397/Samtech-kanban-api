@@ -1,128 +1,212 @@
 # SammTech AI OS
 
-An original, voice-enabled productivity workspace built around the existing NestJS Kanban API. React provides the black-glass and neon-green workspace, Three.js renders Samm, and a separate Python service supplies explainable task assistance. PostgreSQL remains the source of truth and NestJS checks every write.
+### Build your day. Organize your work. Meet Samm.
 
-No commercial AI API key is required. Lightweight intelligence uses deterministic algorithms and TF-IDF search; it does not provide the reasoning ability of an instruction model. Optional local models can be installed separately.
+**SammTech AI OS** is a full-stack, AI-assisted productivity workspace that brings project management, Kanban boards, task automation, analytics, and a voice-enabled assistant into one experience.
 
-## What is implemented
+Built with **React, TypeScript, NestJS, PostgreSQL, Prisma, Python, and FastAPI**.
 
-- JWT registration/login, per-user boards, five default columns, priorities, deadlines, task estimates, emoji labels, checklists, comments and task dependencies.
-- Transactional task creation, deletion and reordering, including concurrent requests; soft-deleted boards cannot be used for new task actions.
-- Dashboard, project overview, Kanban, task details, AI assistant, voice workspace, agents, command center, automations, planner, calendar, derived notifications, analytics, text files, profile and light/dark settings.
-- Custom column creation/renaming/reordering/deletion, sorting, personal task assignment and archived task restoration. Filtered or sorted lists cannot change manual task ordering by dragging.
-- Starter preview status, backend-derived usage/entitlements and confirmed plan-interest records. Pro/Enterprise prices are unannounced; billing, shared membership and administrator activation are not configured.
-- An original procedural 3D robot with an event-driven state machine, reduced motion and a lightweight fallback.
-- Typed or spoken requests → Python interpretation or named workspace commands → editable draft/review → explicit approval button → authorized NestJS transaction → PostgreSQL → refreshed board and audit history. Recognized “yes” alone never authorizes a write.
-- Samm appears in the assistant workspace, with listening/thinking/speaking states, Stop speaking, push-to-talk, a local microphone meter, honest browser activity indicators and bounded per-account conversation history. Signing out clears tab transcripts; recordings are not retained.
-- Browser speech recognition where supported, browser speech synthesis, microphone stop/cancel/mute, and optional local Whisper/Piper adapters. Browser recognition may use the browser vendor's service. Application recordings are not retained.
-- Seven bounded, cancellable agent roles operating on authorized project data. The research role searches project tasks; it does not claim to browse the web.
-- Saved automation rules, conditions, owner, enable/disable controls and execution history. Available actions create reports or approved recurring tasks; they do not run shell commands or send external notifications.
-- Analytics derived from saved tasks and execution records, plus API/database/Python availability checks.
-- Safe JSON task import/export and small text notes. Binary file storage is not implemented.
+[**Launch Live App →**](https://samtech-kanban-api-six.vercel.app/) · [**Explore Backend API →**](https://samtech-kanban-api.onrender.com/api/docs) · [**Source Code**](https://github.com/zahid397/Samtech-kanban-api)
 
-## Architecture
+| Application | Deployment | Link |
+| :-- | :-- | :-- |
+| **Frontend** | Vercel — deployed | [Open SammTech AI OS](https://samtech-kanban-api-six.vercel.app/) |
+| **Backend** | Render — deployed | [Swagger API Documentation](https://samtech-kanban-api.onrender.com/api/docs) |
 
-```mermaid
+> **Made for focused work:** plan visually, manage projects, get practical assistance, and keep important actions under your control.
+
+---
+
+## ✨ What You Can Do
+
+| Feature | Experience |
+| :-- | :-- |
+| **Projects & Kanban** | Personal boards, custom columns, drag-and-drop tasks, priorities, deadlines, checklists, comments, and dependencies. |
+| **Workspace dashboard** | Projects, task details, planner, calendar, derived notifications, and quick navigation in one responsive UI. |
+| **Meet Samm** | An original interactive 3D assistant with listening, thinking, speaking, and feedback states, plus reduced-motion support. |
+| **Voice workspace** | Push-to-talk, browser speech input/output when supported, stop-speaking controls, and microphone-state feedback. |
+| **AI-assisted actions** | Turn supported text or voice requests into editable task drafts; review and approve changes before they are saved. |
+| **Agent workflows** | Seven bounded, cancellable assistance roles operating on authorized workspace data. |
+| **Automations** | Configure workspace rules, schedules, reports, and see execution history. |
+| **Analytics** | View task and workflow trends based on saved application data. |
+| **Workspace utilities** | Search, command center, text notes, JSON task import/export, profile, and light/dark appearance. |
+
+### A task flow that puts you in control
+
+1. Ask Samm to help create or update a task.
+2. Review the suggested action and edit its details.
+3. Explicitly approve the change.
+4. The authenticated NestJS API validates and saves it to PostgreSQL.
+5. Your board refreshes with the saved result and an audit record.
+
+**No silent writes:** saying “yes” to voice recognition alone does not authorize a database change.
+
+---
+
+## 🧩 How It Works
+
+~~~mermaid
 flowchart LR
-  Browser[React + Vite on Vercel] -->|JWT + validated requests| API[NestJS API]
-  API -->|owner-scoped transactions| DB[(PostgreSQL + Prisma)]
-  API -->|private service key + bounded data| Python[FastAPI intelligence]
-  Python --> Optional[Optional local model / speech]
-  Python -->|drafts and explanations| API
-```
+  U[User] --> FE[React + TypeScript + Vite]
+  FE -->|Authenticated API requests| BE[NestJS + TypeScript]
+  BE -->|Prisma transactions| DB[(PostgreSQL)]
+  BE -->|Private service integration| AI[Python + FastAPI]
+  AI -->|Suggestions and explanations| BE
+  BE -->|Validated responses| FE
+~~~
 
-| Directory | Responsibility |
-| --- | --- |
-| `src/` | Existing NestJS API plus workspace gateway, agents, automations and audit events |
-| `prisma/` | PostgreSQL schema, original baseline and reviewed additive migrations |
-| `frontend/` | React/TypeScript, Tailwind, shadcn-style button, R3F/Drei, Motion, Query, Zustand, dnd-kit and Recharts |
-| `ai-engine/` | Python 3.12/FastAPI, NumPy, scikit-learn and optional local inference/speech adapters |
-| `test/` and `frontend/tests/` | Backend regression/integration tests and browser acceptance tests |
-| `scripts/` | Safe migration startup and isolated migration verification |
-| `docs/` | Deployment, migration, local Windows and security details |
+The **NestJS API** is the authority for authentication, ownership checks, validation, and database writes. The Python service supports bounded, explainable task assistance; users remain responsible for approving changes.
 
-## Local setup
+### Technology Stack
 
-Requirements: patched Node.js 24.22.1 (or 22.23.4+ in the supported 22.x line), npm, Python 3.12 and PostgreSQL 16+. Use `.nvmrc`; dependency installation rejects unpatched supported runtimes. Docker Desktop is an optional way to run PostgreSQL. See [Windows setup](docs/LOCAL_WINDOWS.md) for PowerShell commands and optional local models.
+| Layer | Technologies |
+| :-- | :-- |
+| **Frontend** | React, Vite, TypeScript, Tailwind CSS, TanStack Query, Zustand |
+| **Interface** | Three.js, React Three Fiber, Drei, Motion, dnd-kit, Recharts |
+| **Backend** | NestJS, Node.js, TypeScript, REST APIs, JWT |
+| **Data** | PostgreSQL, Prisma |
+| **AI assistance** | Python 3.12, FastAPI, scikit-learn, deterministic workflows and TF-IDF search |
+| **Quality & delivery** | GitHub Actions, Node test runner, Python pytest, Playwright, Docker Compose |
+| **Hosting** | Vercel (frontend), Render (API) |
 
-1. Install dependencies:
+The built-in lightweight intelligence works **without a commercial AI API key**. Optional local models and speech adapters are separate integrations rather than a claim that a large language model ships with the app.
 
-   ```sh
-   npm ci
-   npm --prefix frontend ci
-   python3.12 -m venv ai-engine/.venv
-   ai-engine/.venv/bin/python -m pip install --require-hashes -r ai-engine/requirements-dev.lock
-   ai-engine/.venv/bin/python -m pip install --no-deps -e ./ai-engine
-   ```
+---
 
-2. Copy `.env.example` to `.env` and replace the database password and the three secret placeholders. Set a random `JWT_SECRET`, a different random `AI_SERVICE_KEY`, and a different `SCHEDULER_SECRET`, each at least 32 characters. Keep them out of Git. The Python service receives the same `AI_SERVICE_KEY` as NestJS. A random secret can be generated locally with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
-3. For a new local database, run `docker compose up -d database`. Set `DATABASE_URL` to that database. For an existing database, first read [safe migration instructions](docs/MIGRATIONS.md) and take a backup.
-4. Run migrations and compile:
+## 🚀 Run It Locally
 
-   ```sh
-   node scripts/migrate-safe.cjs
-   npm run build
-   ```
+### Requirements
 
-5. Start the services in three terminals. The local Python launcher reads the shared service key from root `.env` and removes API/database secrets from its child environment:
+- Node.js **24.22.1+** in the supported 24.x line, or **22.23.4+** in the supported 22.x line
+- npm and **Python 3.12**
+- PostgreSQL **16+** (Docker Desktop is optional)
+- Git
 
-   ```sh
-   # Repository root: Nest reads .env.
-   npm run start:dev
-   # Repository root: Python virtual environment must already be installed.
-   node scripts/run-ai.cjs
-   # Repository root: Vite proxies /api to port 5000.
-   npm --prefix frontend run dev
-   ```
+### 1. Clone and install
 
-Open `http://localhost:5173`, create an account and create a board. Enter “Create a task called Fix Login Bug by tomorrow” in AI Assistant, review it, and approve it. The task appears only after the API confirms persistence. Refresh the browser to check it remains.
+~~~bash
+git clone https://github.com/zahid397/Samtech-kanban-api.git
+cd Samtech-kanban-api
+npm ci
+npm --prefix frontend ci
+~~~
 
-Swagger is at `http://localhost:5000/api/docs`; liveness is `/`; database readiness is `/health/ready`. The authenticated `/workspace/health` endpoint includes Python availability.
+Create the Python environment on macOS/Linux:
 
-## Cloud deployment
+~~~bash
+python3.12 -m venv ai-engine/.venv
+ai-engine/.venv/bin/python -m pip install --require-hashes -r ai-engine/requirements-dev.lock
+ai-engine/.venv/bin/python -m pip install --no-deps -e ./ai-engine
+~~~
 
-The earlier frontend at https://sammtech-ai-os.vercel.app was deployed and browser-checked, but the latest live check now returns HTTP 404 `DEPLOYMENT_NOT_FOUND`. Access to its existing Vercel team/project must be restored before release. Render has a live legacy API and verified `/api/docs` UI. The latest full-stack recovery changes need deployment and production acceptance checks. See the [implementation report](docs/IMPLEMENTATION_REPORT.md) for exact test results and release blockers.
+On Windows, use **py -3.12 -m venv ai-engine/.venv** and the Python executable inside **ai-engine/.venv/Scripts/**. More details: [Windows setup guide](docs/LOCAL_WINDOWS.md).
 
-The frontend is prepared for **Vercel**, with its project Root Directory set to `frontend`. `frontend/vercel.json` builds Vite, enables SPA navigation and sets basic security headers. Set public build variable `VITE_API_URL` to the HTTPS NestJS API origin. Add the exact Vercel origin to the API's `CORS_ORIGIN` list. A configured frontend build does not establish that the API or database is live.
+### 2. Configure the environment
 
-`render.yaml` targets the existing `Samtech-kanban-api` service in Virginia and defines a separate lightweight Python web service. It deliberately does not provision or replace PostgreSQL. Supply the existing `DATABASE_URL` securely and follow the migration guide. Models are not downloaded as part of deployment. Read [deployment instructions](docs/DEPLOYMENT.md) before applying the Blueprint.
+Copy **.env.example** to **.env**. Configure the PostgreSQL connection (**DATABASE_URL**) and independent random values of at least 32 characters for **JWT_SECRET**, **AI_SERVICE_KEY**, and **SCHEDULER_SECRET**.
 
-Render free services sleep, have an ephemeral filesystem and share limited free instance hours. They cannot guarantee continuous background automation. Use an always-on worker or an authenticated external scheduler for dependable timing. Free PostgreSQL instances expire; choose a durable database and backups for valuable data. Details and current provider references are in the deployment guide.
+For a **new local database**, you can use:
 
-## Validation
+~~~bash
+docker compose up -d database
+node scripts/migrate-safe.cjs
+~~~
 
-Use `npm run verify` for the unified build/unit/audit checks, or `npm run verify:all` with an isolated `sammtech_test` database for the managed full browser workflow. See [TESTING.md](docs/TESTING.md). Individual checks remain available:
+If you are connecting to an existing database, review the [migration guide](docs/MIGRATIONS.md) and back up its data first.
 
-```sh
-npm run build
-npm run lint
-npm test
-npm --prefix frontend run build
-ai-engine/.venv/bin/python -m pytest ai-engine/tests -q
-npm audit
-npm --prefix frontend audit
-```
+### 3. Launch the application
 
-Database tests require an isolated database named `sammtech_test`; they refuse another name. Set its `DATABASE_URL` and test-only `JWT_SECRET` in the process environment, then run:
+Open three terminals in the repository root:
 
-```sh
-npx prisma migrate deploy
-npm run test:integration
-node scripts/verify-migrations.cjs
-```
+**Terminal A — NestJS backend**
 
-The migration verifier creates and drops only its own randomly named schemas inside that test database. It checks clean installation, exact legacy baselining with data preservation, and refusal of unexpected schema drift. Never point integration tests at production.
+~~~bash
+npm run start:dev
+~~~
 
-Browser acceptance testing uses the local frontend, API, Python and isolated PostgreSQL. See the Playwright configuration in `frontend/` for the available command and required local services. The CI workflow runs builds, Python tests, backend tests and migration checks with temporary PostgreSQL and test-only secrets; it does not deploy or access production credentials.
+**Terminal B — Python assistance service**
 
-## Practical limits
+~~~bash
+node scripts/run-ai.cjs
+~~~
 
-- Lightweight NLP supports explicit English keywords and a limited set of date expressions, using UTC. Users review ambiguous requests and proposed deadlines.
-- Semantic search is optional and needs a separately installed local embedding model. The default search is lexical TF-IDF.
-- Instruction models, local Whisper and Piper require separately installed software and model assets. Their output quality and hardware speed vary; adapters require testing on the target machine. No Bangla support is claimed.
-- Voice playback starts from user interaction and depends on browser permissions/voices. Browser synthesis uses approximate mouth animation; local audio can drive mouth amplitude. Advanced phoneme lip synchronization is not provided.
-- Automations create workspace reports, not email/push notifications. Sleeping services may coalesce missed runs instead of replaying a backlog.
-- Current completion trends use each task's present completion timestamp. Existing Done tasks get an approximate historic timestamp during migration; the chart is not a full immutable history of every status transition.
-- Local preferences stay on the device and JWT sessions stay in the browser tab. Account recovery, email verification, collaboration and distributed rate-limit storage are future work.
+**Terminal C — React frontend**
 
-See [security review](docs/SECURITY.md), [safe migrations](docs/MIGRATIONS.md), [Vercel/Render deployment](docs/DEPLOYMENT.md) and [Windows/local AI setup](docs/LOCAL_WINDOWS.md).
+~~~bash
+npm --prefix frontend run dev
+~~~
+
+| Local address | Service |
+| :-- | :-- |
+| http://localhost:5173 | Frontend |
+| http://localhost:5000/api/docs | API documentation |
+| http://localhost:5000/health/ready | API/database readiness |
+
+Create an account, start a board, and try: **“Create a task called Fix Login Bug by tomorrow.”** Review the draft, approve it, and refresh your board to see the saved result.
+
+---
+
+## 🧪 Testing & Reliability
+
+The project includes backend unit tests, PostgreSQL integration tests, Python tests, migration safety checks, and browser-level tests.
+
+The last documented full local verification reported:
+
+| Test suite | Result |
+| :-- | --: |
+| Backend unit tests | **7 passed** |
+| PostgreSQL integration tests | **9 passed** |
+| Python tests | **44 passed** |
+| Playwright browser scenarios | **10 passed** |
+| Migration safety scenarios | **3 passed** |
+
+Run routine checks:
+
+~~~bash
+npm run verify
+~~~
+
+For full integration and browser verification, configure a **disposable database named sammtech_test** and run:
+
+~~~bash
+npm run verify:all
+~~~
+
+See [Testing Guide](docs/TESTING.md) for prerequisites and Windows instructions. Integration tests must never target a production database.
+
+---
+
+## 📁 Project Structure
+
+~~~text
+Samtech-kanban-api/
+├── src/                   NestJS API, auth, workspace and agents
+├── frontend/              React workspace and Samm interface
+├── ai-engine/             Python/FastAPI assistance service
+├── prisma/                PostgreSQL schema and migrations
+├── test/                  Backend tests
+├── scripts/               Verification and safe database startup
+├── docs/                  Setup, deployment, security and testing guides
+├── compose.yaml           Local database configuration
+└── render.yaml            Hosting blueprint
+~~~
+
+## 🔐 Designed With Care
+
+- JWT authentication, per-user ownership checks, input validation, and audit-friendly operations.
+- Protected updates with explicit user approval.
+- Backend-authorized database transactions rather than direct AI writes.
+- Configuration secrets stay server-side and out of the repository.
+- Safe migration tooling and repeatable automated checks.
+
+**Current feature scope:** AI suggestions use lightweight rules and search unless optional models are configured. Browser speech depends on device/browser support. Automations create workspace reports; external email/push delivery, paid billing, and shared-team administration are not currently included.
+
+For operational details, see [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md), [Migrations](docs/MIGRATIONS.md), and [Testing](docs/TESTING.md).
+
+---
+
+### Built by Zahid Hasan
+
+[GitHub](https://github.com/zahid397) · [Portfolio](https://zahidprotfilio.vercel.app)
+
+**SammTech AI OS — a smarter workspace, built one practical feature at a time.**
