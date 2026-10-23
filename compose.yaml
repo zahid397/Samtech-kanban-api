@@ -1,0 +1,20 @@
+# Development database only. The named volume persists data across container restarts.
+# `docker compose down -v` destroys it; do not use that command against valued data.
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sammtech
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - sammtech-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sammtech"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+volumes:
+  sammtech-postgres:

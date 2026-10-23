@@ -1,7 +1,9 @@
+import { audit, taskDetails } from '../tasks/tasks.service';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBoardDto } from './dto/create-board.dto';
+import { UpdateBoardDto } from './dto/update-board.dto';
 import { QueryTaskDto } from '../tasks/dto/query-task.dto';
 
 // Every new board is seeded with these columns, matching the default Kanban
@@ -13,17 +15,25 @@ export class BoardsService {
   constructor(private readonly prisma: PrismaService) {}
 
   create(userId: string, dto: CreateBoardDto) {
-    return this.prisma.board.create({
-      data: {
-        title: dto.title,
-        userId,
-        columns: {
-          create: DEFAULT_COLUMNS.map((title, index) => ({ title, order: index })),
+    return this.prisma.write(userId, async (tx) => {
+      const board = await tx.board.create({
+        data: {
+          title: dto.title,
+          userId,
+          columns: {
+            create: DEFAULT_COLUMNS.map((title, index) => ({
+              title,
+              order: index,
+              isDone: title === 'Done',
+            })),
+          },
         },
-      },
-      include: {
-        columns: { orderBy: { order: 'asc' } },
-      },
+        include: {
+          columns: { orderBy: { order: 'asc' } },
+        },
+      });
+      await audit(tx, userId, 'board.created', board.id, { title: board.title });
+      return board;
     });
   }
 
@@ -55,7 +65,7 @@ export class BoardsService {
     if (query.dueDate) {
       const start = new Date(query.dueDate);
       const end = new Date(start);
-      end.setDate(end.getDate() + 1);
+      end.setUTCDate(end.getUTCDate() + 1);
       taskWhere.dueDate = { gte: start, lt: end };
     }
 
@@ -68,6 +78,7 @@ export class BoardsService {
             tasks: {
               where: taskWhere,
               orderBy: { position: 'asc' },
+              include: taskDetails,
             },
           },
         },
@@ -75,21 +86,39 @@ export class BoardsService {
     });
   }
 
-  async softDelete(userId: string, boardId: string) {
-    const board = await this.prisma.board.findUnique({ where: { id: boardId } });
-
-    if (!board || board.deletedAt) {
-      throw new NotFoundException('Board not found');
-    }
-    if (board.userId !== userId) {
-      throw new ForbiddenException('You do not have access to this board');
-    }
-
-    await this.prisma.board.update({
-      where: { id: boardId },
-      data: { deletedAt: new Date() },
+  update(userId: string, boardId: string, dto: UpdateBoardDto) {
+    return this.prisma.write(userId, async (tx) => {
+      const board = await tx.board.findUnique({ where: { id: boardId } });
+      if (!board || board.deletedAt) throw new NotFoundException('Board not found');
+      if (board.userId !== userId)
+        throw new ForbiddenException('You do not have access to this board');
+      const updated = await tx.board.update({
+        where: { id: boardId },
+        data: { title: dto.title },
+      });
+      await audit(tx, userId, 'board.updated', boardId, { title: updated.title });
+      return updated;
     });
+  }
 
-    return { message: 'Board deleted successfully' };
+  async softDelete(userId: string, boardId: string) {
+    return this.prisma.write(userId, async (tx) => {
+      const board = await tx.board.findUnique({ where: { id: boardId } });
+
+      if (!board || board.deletedAt) {
+        throw new NotFoundException('Board not found');
+      }
+      if (board.userId !== userId) {
+        throw new ForbiddenException('You do not have access to this board');
+      }
+
+      await tx.board.update({
+        where: { id: boardId },
+        data: { deletedAt: new Date() },
+      });
+
+      await audit(tx, userId, 'board.deleted', boardId);
+      return { message: 'Board deleted successfully' };
+    });
   }
 }

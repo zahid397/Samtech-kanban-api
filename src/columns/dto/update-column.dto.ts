@@ -1,16 +1,18 @@
+import { Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, ValidateIf, IsString, MaxLength, Min } from 'class-validator';
 
 export class UpdateColumnDto {
   @ApiPropertyOptional({ example: 'Code Review' })
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty()
   @MaxLength(60)
   title?: string;
 
   @ApiPropertyOptional({ example: 1 })
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsInt()
   @Min(0)
   order?: number;

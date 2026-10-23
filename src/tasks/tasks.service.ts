@@ -4,219 +4,238 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { MoveTaskDto } from './dto/move-task.dto';
 
+export const taskDetails = {
+  labels: true,
+  checklist: true,
+  comments: { orderBy: { createdAt: 'asc' as const } },
+  dependencies: true,
+};
+export function audit(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  action: string,
+  entityId?: string,
+  details: Prisma.InputJsonValue = {},
+) {
+  return tx.auditLog.create({ data: { userId, action, entityId, details } });
+}
 @Injectable()
 export class TasksService {
   constructor(private readonly prisma: PrismaService) {}
-
-  async create(userId: string, columnId: string, dto: CreateTaskDto) {
-    const column = await this.prisma.column.findUnique({
+  async owned(tx: Prisma.TransactionClient, userId: string, taskId: string) {
+    const task = await tx.task.findFirst({
+      where: { id: taskId, deletedAt: null },
+      include: { column: { include: { board: true } } },
+    });
+    if (!task || task.column.board.deletedAt) throw new NotFoundException('Task not found');
+    if (task.column.board.userId !== userId) throw new ForbiddenException('Task access denied');
+    return task;
+  }
+  async createIn(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    columnId: string,
+    dto: CreateTaskDto,
+  ) {
+    const column = await tx.column.findUnique({
       where: { id: columnId },
       include: { board: true },
     });
-
-    if (!column || column.board.deletedAt) {
-      throw new NotFoundException('Column not found');
-    }
-    if (column.board.userId !== userId) {
-      throw new ForbiddenException('You do not have access to this column');
-    }
-    if (dto.assigneeId) {
-      await this.assertAssigneeExists(dto.assigneeId);
-    }
-
-    const lastTask = await this.prisma.task.findFirst({
-      where: { columnId, deletedAt: null },
-      orderBy: { position: 'desc' },
-    });
-    const position = lastTask ? lastTask.position + 1 : 0;
-
-    return this.prisma.task.create({
+    if (!column || column.board.deletedAt) throw new NotFoundException('Column not found');
+    if (column.board.userId !== userId) throw new ForbiddenException('Column access denied');
+    if (dto.assigneeId && dto.assigneeId !== userId)
+      throw new BadRequestException('Only the board owner can be assigned');
+    const position = await tx.task.count({ where: { columnId, deletedAt: null } });
+    const task = await tx.task.create({
       data: {
         title: dto.title,
         description: dto.description,
         priority: dto.priority,
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
         assigneeId: dto.assigneeId,
         columnId,
         position,
+        completedAt: column.isDone ? new Date() : null,
+        estimateMinutes: dto.estimateMinutes,
+        labels: { create: dto.labels || [] },
+        checklist: { create: dto.checklist || [] },
+      },
+      include: taskDetails,
+    });
+    await audit(tx, userId, 'task.created', task.id, { title: task.title });
+    return task;
+  }
+  create(userId: string, columnId: string, dto: CreateTaskDto) {
+    return this.prisma.write(userId, (tx) => this.createIn(tx, userId, columnId, dto));
+  }
+  update(userId: string, taskId: string, dto: UpdateTaskDto) {
+    return this.prisma.write(userId, async (tx) => {
+      await this.owned(tx, userId, taskId);
+      if (dto.assigneeId && dto.assigneeId !== userId)
+        throw new BadRequestException('Only the board owner can be assigned');
+      const { labels, checklist, dueDate, ...fields } = dto;
+      const task = await tx.task.update({
+        where: { id: taskId },
+        data: {
+          ...fields,
+          ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
+          ...(labels && { labels: { deleteMany: {}, create: labels } }),
+          ...(checklist && { checklist: { deleteMany: {}, create: checklist } }),
+        },
+        include: taskDetails,
+      });
+      await audit(tx, userId, 'task.updated', taskId);
+      return task;
+    });
+  }
+  remove(userId: string, taskId: string) {
+    return this.prisma.write(userId, async (tx) => {
+      const task = await this.owned(tx, userId, taskId);
+      await tx.task.update({ where: { id: taskId }, data: { deletedAt: new Date() } });
+      await tx.task.updateMany({
+        where: { columnId: task.columnId, deletedAt: null, position: { gt: task.position } },
+        data: { position: { decrement: 1 } },
+      });
+      await audit(tx, userId, 'task.deleted', taskId);
+      return { message: 'Task deleted successfully' };
+    });
+  }
+  archived(userId: string) {
+    return this.prisma.task.findMany({
+      where: { deletedAt: { not: null }, column: { board: { userId, deletedAt: null } } },
+      orderBy: { deletedAt: 'desc' },
+      take: 200,
+      include: {
+        ...taskDetails,
+        column: { select: { title: true, board: { select: { title: true } } } },
       },
     });
   }
-
-  async update(userId: string, taskId: string, dto: UpdateTaskDto) {
-    const task = await this.findActiveTaskOrThrow(taskId);
-    this.assertOwnership(task, userId);
-
-    if (dto.assigneeId) {
-      await this.assertAssigneeExists(dto.assigneeId);
-    }
-
-    return this.prisma.task.update({
-      where: { id: taskId },
-      data: {
-        ...(dto.title !== undefined && { title: dto.title }),
-        ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.priority !== undefined && { priority: dto.priority }),
-        ...(dto.dueDate !== undefined && { dueDate: new Date(dto.dueDate) }),
-        ...(dto.assigneeId !== undefined && { assigneeId: dto.assigneeId }),
-      },
-    });
-  }
-
-  async remove(userId: string, taskId: string) {
-    const task = await this.findActiveTaskOrThrow(taskId);
-    this.assertOwnership(task, userId);
-
-    await this.prisma.task.update({
-      where: { id: taskId },
-      data: { deletedAt: new Date() },
-    });
-
-    return { message: 'Task deleted successfully' };
-  }
-
-  /**
-   * Moves a task within its current column (reorder) or into a different
-   * column on the same board (transfer + reorder). Runs entirely inside one
-   * Prisma interactive transaction so a crash mid-shift can never leave two
-   * tasks sharing a position or a gap in the sequence.
-   *
-   * Positions are plain contiguous integers per column (0, 1, 2, ...) rather
-   * than sparse/fractional keys — simpler to reason about and to display,
-   * at the cost of an update to every task between the old and new spot
-   * instead of touching just one row. For typical Kanban column sizes
-   * that trade-off is the right one. Full write-up in README > Key
-   * Technical Decisions.
-   */
-  async move(userId: string, taskId: string, dto: MoveTaskDto) {
-    return this.prisma.$transaction(async (tx) => {
-      const task = await tx.task.findFirst({
-        where: { id: taskId, deletedAt: null },
+  restore(userId: string, taskId: string) {
+    return this.prisma.write(userId, async (tx) => {
+      const task = await tx.task.findUnique({
+        where: { id: taskId },
         include: { column: { include: { board: true } } },
       });
-
-      if (!task) {
-        throw new NotFoundException('Task not found');
-      }
-      if (task.column.board.userId !== userId) {
-        throw new ForbiddenException('You do not have access to this task');
-      }
-
-      const targetColumn = await tx.column.findUnique({
+      if (!task || task.column.board.deletedAt) throw new NotFoundException('Task not found');
+      if (task.column.board.userId !== userId) throw new ForbiddenException('Task access denied');
+      if (!task.deletedAt) return task;
+      const position = await tx.task.count({ where: { columnId: task.columnId, deletedAt: null } });
+      const restored = await tx.task.update({
+        where: { id: taskId },
+        data: { deletedAt: null, position },
+        include: taskDetails,
+      });
+      await audit(tx, userId, 'task.restored', taskId);
+      return restored;
+    });
+  }
+  move(userId: string, taskId: string, dto: MoveTaskDto) {
+    return this.prisma.write(userId, async (tx) => {
+      const task = await this.owned(tx, userId, taskId);
+      const target = await tx.column.findUnique({
         where: { id: dto.targetColumnId },
         include: { board: true },
       });
-
-      if (!targetColumn) {
-        throw new NotFoundException('Target column not found');
-      }
-      if (targetColumn.boardId !== task.column.boardId) {
+      if (!target || target.board.deletedAt) throw new NotFoundException('Target column not found');
+      if (target.boardId !== task.column.boardId)
         throw new BadRequestException('Tasks can only be moved within the same board');
-      }
-      if (targetColumn.board.userId !== userId) {
-        throw new ForbiddenException('You do not have access to the target column');
-      }
-
-      const sourceColumnId = task.columnId;
-      const targetColumnId = dto.targetColumnId;
-      const isSameColumn = sourceColumnId === targetColumnId;
-
-      // Clamp newPosition into the valid range for the target column so a
-      // client can't push a task past the end of the list or to a negative
-      // index.
-      const taskCountInTarget = await tx.task.count({
-        where: isSameColumn
-          ? { columnId: targetColumnId, deletedAt: null, NOT: { id: taskId } }
-          : { columnId: targetColumnId, deletedAt: null },
+      if (target.board.userId !== userId) throw new ForbiddenException('Column access denied');
+      const count = await tx.task.count({
+        where: { columnId: target.id, deletedAt: null, NOT: { id: taskId } },
       });
-      const newPosition = Math.max(0, Math.min(dto.newPosition, taskCountInTarget));
-
-      if (isSameColumn) {
-        const oldPosition = task.position;
-        if (newPosition === oldPosition) {
-          return task;
-        }
-
-        if (newPosition < oldPosition) {
-          // Task moved up: everything between the new spot and the old spot
-          // shifts down by one to make room.
+      const position = Math.max(0, Math.min(dto.newPosition, count));
+      if (target.id === task.columnId) {
+        if (position < task.position)
           await tx.task.updateMany({
             where: {
-              columnId: sourceColumnId,
+              columnId: task.columnId,
               deletedAt: null,
-              position: { gte: newPosition, lt: oldPosition },
+              position: { gte: position, lt: task.position },
             },
             data: { position: { increment: 1 } },
           });
-        } else {
-          // Task moved down: everything between the old spot and the new
-          // spot shifts up by one to close the gap.
+        if (position > task.position)
           await tx.task.updateMany({
             where: {
-              columnId: sourceColumnId,
+              columnId: task.columnId,
               deletedAt: null,
-              position: { gt: oldPosition, lte: newPosition },
+              position: { gt: task.position, lte: position },
             },
             data: { position: { decrement: 1 } },
           });
-        }
-
-        return tx.task.update({ where: { id: taskId }, data: { position: newPosition } });
+      } else {
+        await tx.task.updateMany({
+          where: { columnId: task.columnId, deletedAt: null, position: { gt: task.position } },
+          data: { position: { decrement: 1 } },
+        });
+        await tx.task.updateMany({
+          where: { columnId: target.id, deletedAt: null, position: { gte: position } },
+          data: { position: { increment: 1 } },
+        });
       }
-
-      // Cross-column move: close the gap left behind in the source column,
-      // then open a gap at the destination, then relocate the task itself.
-      await tx.task.updateMany({
-        where: { columnId: sourceColumnId, deletedAt: null, position: { gt: task.position } },
-        data: { position: { decrement: 1 } },
-      });
-
-      await tx.task.updateMany({
-        where: { columnId: targetColumnId, deletedAt: null, position: { gte: newPosition } },
-        data: { position: { increment: 1 } },
-      });
-
-      return tx.task.update({
+      const moved = await tx.task.update({
         where: { id: taskId },
-        data: { columnId: targetColumnId, position: newPosition },
+        data: {
+          columnId: target.id,
+          position,
+          completedAt: target.isDone ? task.completedAt || new Date() : null,
+        },
+        include: taskDetails,
       });
+      await audit(tx, userId, 'task.moved', taskId, {
+        from: task.columnId,
+        to: target.id,
+        position,
+      });
+      return moved;
     });
   }
-
-  private async findActiveTaskOrThrow(taskId: string) {
-    const task = await this.prisma.task.findFirst({
-      where: { id: taskId, deletedAt: null },
-      include: { column: { include: { board: true } } },
+  comment(userId: string, taskId: string, body: string) {
+    return this.prisma.write(userId, async (tx) => {
+      await this.owned(tx, userId, taskId);
+      const comment = await tx.comment.create({ data: { taskId, authorId: userId, body } });
+      await audit(tx, userId, 'task.commented', taskId);
+      return comment;
     });
-
-    if (!task) {
-      throw new NotFoundException('Task not found');
-    }
-
-    return task;
   }
-
-  private assertOwnership(
-    task: { column: { board: { userId: string; deletedAt: Date | null } } },
-    userId: string,
-  ) {
-    if (task.column.board.deletedAt) {
-      throw new NotFoundException('Task not found');
-    }
-    if (task.column.board.userId !== userId) {
-      throw new ForbiddenException('You do not have access to this task');
-    }
-  }
-
-  private async assertAssigneeExists(assigneeId: string) {
-    const assignee = await this.prisma.user.findUnique({ where: { id: assigneeId } });
-    if (!assignee) {
-      throw new BadRequestException('assigneeId does not match any existing user');
-    }
+  dependency(userId: string, taskId: string, dependsOnId: string, remove = false) {
+    return this.prisma.write(userId, async (tx) => {
+      const task = await this.owned(tx, userId, taskId);
+      if (remove) {
+        await tx.taskDependency.deleteMany({ where: { taskId, dependsOnId } });
+      } else {
+        const other = await this.owned(tx, userId, dependsOnId);
+        if (task.column.boardId !== other.column.boardId || taskId === dependsOnId)
+          throw new BadRequestException('Dependencies must be different tasks on the same board');
+        const edges = await tx.taskDependency.findMany({
+          where: { task: { column: { boardId: task.column.boardId } } },
+        });
+        const pending = [dependsOnId],
+          seen = new Set<string>();
+        while (pending.length) {
+          const node = pending.pop()!;
+          if (node === taskId) throw new BadRequestException('Dependency would create a cycle');
+          if (seen.has(node)) continue;
+          seen.add(node);
+          pending.push(...edges.filter((e) => e.taskId === node).map((e) => e.dependsOnId));
+        }
+        await tx.taskDependency.upsert({
+          where: { taskId_dependsOnId: { taskId, dependsOnId } },
+          create: { taskId, dependsOnId },
+          update: {},
+        });
+      }
+      await audit(tx, userId, remove ? 'dependency.removed' : 'dependency.added', taskId, {
+        dependsOnId,
+      });
+      return { ok: true };
+    });
   }
 }

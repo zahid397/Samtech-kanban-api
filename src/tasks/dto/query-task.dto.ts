@@ -21,6 +21,6 @@ export class QueryTaskDto {
     description: 'Filter tasks due on this date (YYYY-MM-DD)',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'dueDate must be a valid ISO date string (YYYY-MM-DD)' })
+  @IsDateString({ strict: true }, { message: 'dueDate must be a valid ISO date string (YYYY-MM-DD)' })
   dueDate?: string;
 }

@@ -9,6 +9,9 @@ import { AppService } from './app.service';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  @Get('health/ready')
+  ready() { return this.appService.ready(); }
+
   @Get()
   @ApiOperation({ summary: 'Health check' })
   getHealth() {

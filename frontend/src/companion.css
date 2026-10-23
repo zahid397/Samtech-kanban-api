@@ -1,0 +1,213 @@
+.companion-stage {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: 30px;
+  padding: 20px 32px;
+  margin-bottom: 24px;
+  background:
+    radial-gradient(ellipse at 15% 30%, #72e7dc12, transparent 60%), var(--panel, #101710);
+  overflow: hidden;
+}
+.companion-stage-scene {
+  height: 260px;
+  position: relative;
+  min-width: 0;
+}
+.companion-stage-scene .mascot-canvas {
+  height: 100%;
+  position: relative;
+}
+.companion-stage-copy h2 {
+  font-size: clamp(24px, 3vw, 36px);
+  line-height: 1.17;
+  letter-spacing: -1px;
+  margin: 12px 0;
+}
+.companion-stage-copy > p {
+  color: var(--muted, #9aa596);
+  line-height: 1.65;
+  margin-bottom: 15px;
+}
+.companion-stage-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.companion-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--muted, #9aa596);
+}
+.companion-signal {
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 0;
+  max-width: 240px;
+}
+.companion-signal i {
+  display: block;
+  width: 5px;
+  max-height: 43px;
+  border-radius: 6px;
+  background: #73c8c0;
+  opacity: 0.3;
+  transition:
+    height 90ms linear,
+    opacity 0.15s;
+}
+.companion-signal.active i {
+  opacity: 0.9;
+  background: #8be5d8;
+}
+.recognition-pulse i {
+  animation: recognition-indicator 900ms ease-in-out infinite alternate;
+}
+@keyframes recognition-indicator {
+  to {
+    opacity: 0.4;
+    transform: scaleY(2.2);
+  }
+}
+.companion-push-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 7px;
+  flex-wrap: wrap;
+}
+.companion-push-row .push-to-talk {
+  touch-action: none;
+  user-select: none;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.companion-push-row small {
+  font-size: 10px;
+}
+.companion-history {
+  margin-top: 20px;
+  border-top: 1px solid #6d8a7730;
+  padding-top: 15px;
+  font-size: 12px;
+}
+.companion-history summary {
+  cursor: pointer;
+  color: var(--text, #e3ebdf);
+}
+.companion-history > p {
+  margin: 12px 0;
+  line-height: 1.6;
+  font-size: 11px;
+}
+.companion-history ol {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  max-height: 280px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.companion-history li {
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: #819f8820;
+  margin: 8px 0;
+}
+.companion-history li.user {
+  margin-left: 18px;
+  background: #73c8c014;
+}
+.companion-history li small {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.companion-history li p {
+  font-size: 12px;
+  white-space: pre-wrap;
+  line-height: 1.65;
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+}
+.companion-react {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #a2c48b55;
+  border-radius: 50%;
+  color: #b7ef9b;
+  background: #15251ccc;
+  cursor: pointer;
+  z-index: 2;
+}
+.companion-react:hover,
+.companion-react:focus-visible {
+  outline: 2px solid #7edacb;
+  outline-offset: 3px;
+  background: #264235;
+}
+.mascot-canvas {
+  position: relative;
+}
+.companion-loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--muted, #9aa596);
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .companion-stage {
+    grid-template-columns: 1fr;
+    padding: 15px 20px;
+    gap: 0;
+  }
+  .companion-stage-scene {
+    height: 210px;
+  }
+  .companion-stage-copy h2 {
+    font-size: 27px;
+  }
+  .companion-stage-copy {
+    padding-bottom: 10px;
+  }
+  .companion-stage-actions {
+    gap: 6px;
+  }
+  .companion-stage-actions button {
+    font-size: 11px;
+  }
+  .companion-history li {
+    padding: 10px;
+  }
+  .companion-signal {
+    margin: 3px 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .recognition-pulse i {
+    animation: none;
+  }
+  .companion-signal i {
+    transition: none;
+  }
+}
+.reduce-motion .recognition-pulse i {
+  animation: none;
+}
+:root[data-theme='light'] .companion-stage {
+  background: radial-gradient(ellipse at 15% 30%, #46c2b313, transparent 60%), #f4f8f1;
+}
+:root[data-theme='light'] .companion-state,
+:root[data-theme='light'] .companion-stage-copy > p {
+  color: #526651;
+}

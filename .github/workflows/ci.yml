@@ -1,0 +1,98 @@
+name: Test SammTech AI OS
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: sammtech-ci-test-only
+          POSTGRES_DB: sammtech_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sammtech_test"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    env:
+      # Disposable CI-only credentials, never production secrets.
+      DATABASE_URL: postgresql://postgres:sammtech-ci-test-only@127.0.0.1:5432/sammtech_test
+      JWT_SECRET: sammtech-ci-jwt-key-for-disposable-tests-only
+      AI_SERVICE_KEY: sammtech-ci-ai-key-for-disposable-tests-only
+      AI_ENGINE_URL: http://127.0.0.1:8000
+      SCHEDULER_SECRET: sammtech-ci-scheduler-key-for-disposable-tests-only
+      CORS_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
+      AUTOMATION_WORKER_ENABLED: 'false'
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.22.1'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Install locked dependencies
+        run: |
+          npm ci
+          npm --prefix frontend ci
+          python -m pip install --require-hashes -r ai-engine/requirements-dev.lock
+          python -m pip install --no-deps -e ./ai-engine
+      - name: Build and static checks
+        run: |
+          npm run build
+          npm run lint
+          npm test
+          npm --prefix frontend run build
+          python -m pytest ai-engine/tests -q
+      - name: Migrations and database regression tests
+        run: |
+          node scripts/migrate-safe.cjs
+          npm run test:integration
+          node scripts/verify-migrations.cjs
+      - name: Browser acceptance flow
+        run: |
+          cd frontend
+          npx playwright install --with-deps chromium
+          node -e "require('fs').writeFileSync('/tmp/sammtech-chromium-path',require('@playwright/test').chromium.executablePath())"
+          cd ..
+          pids=()
+          trap 'if ((${#pids[@]})); then kill "${pids[@]}" 2>/dev/null || true; fi' EXIT
+          python -m uvicorn --app-dir ai-engine app.main:app --host 127.0.0.1 --port 8000 > /tmp/sammtech-ai.log 2>&1 &
+          pids+=("$!")
+          node dist/main.js > /tmp/sammtech-api.log 2>&1 &
+          pids+=("$!")
+          node frontend/node_modules/vite/bin/vite.js --config frontend/vite.config.ts --host 127.0.0.1 --port 5173 --strictPort frontend > /tmp/sammtech-frontend.log 2>&1 &
+          pids+=("$!")
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/health > /dev/null && curl --fail --silent http://127.0.0.1:5000/health/ready > /dev/null && curl --fail --silent http://127.0.0.1:5173/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8000/health > /dev/null
+          curl --fail --silent http://127.0.0.1:5000/health/ready > /dev/null
+          curl --fail --silent http://127.0.0.1:5173/ > /dev/null
+          export CHROMIUM_PATH="$(cat /tmp/sammtech-chromium-path)"
+          npm --prefix frontend run test:e2e
+      - name: Dependency advisories
+        run: |
+          npm audit
+          npm --prefix frontend audit
+          pip-audit --skip-editable
+      # Do not upload .env, auth state, browser traces or request logs.

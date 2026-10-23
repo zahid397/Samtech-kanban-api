@@ -1,3 +1,5 @@
+import { WorkspaceModule } from './workspace/workspace.module';
+import { validateEnvironment } from './config';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -13,7 +15,7 @@ import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
     PrismaModule,
     AuthModule,
@@ -21,6 +23,7 @@ import { TasksModule } from './tasks/tasks.module';
     BoardsModule,
     ColumnsModule,
     TasksModule,
+    WorkspaceModule,
   ],
   controllers: [AppController],
   providers: [
