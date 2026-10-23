@@ -95,4 +95,65 @@ jobs:
           npm audit
           npm --prefix frontend audit
           pip-audit --skip-editable
+      - name: Live production read-only smoke audit
+        if: github.event_name == 'pull_request' && github.head_ref == 'codex/sammtech-e2e-audit-20261023'
+        run: |
+          python3 - <<'PY'
+          import json
+          import time
+          from urllib import request, error
+
+          frontend = 'https://samtech-kanban-api-six.vercel.app'
+          backend = 'https://samtech-kanban-api.onrender.com'
+          python_ai = 'https://sammtech-ai-engine.onrender.com'
+
+          def probe(label, url, method='GET', headers=None, acceptable=(200,)):
+              last = None
+              for attempt in range(4):
+                  try:
+                      req = request.Request(url, method=method, headers=headers or {})
+                      try:
+                          with request.urlopen(req, timeout=50) as resp:
+                              status, output, response_headers = resp.status, resp.read(250000), resp.headers
+                      except error.HTTPError as exc:
+                          status, output, response_headers = exc.code, exc.read(250000), exc.headers
+                      if status in acceptable:
+                          print(f'PASS {label}: HTTP {status}')
+                          return status, output, response_headers
+                      last = f'HTTP {status}'
+                  except Exception as exc:
+                      last = f'{type(exc).__name__}: {str(exc)[:120]}'
+                  print(f'RETRY {label} ({attempt+1}/4): {last}')
+                  if attempt < 3:
+                      time.sleep(8)
+              raise SystemExit(f'FAIL {label}: {last}')
+
+          _, body, _ = probe('API + PostgreSQL ready', backend + '/health/ready')
+          assert json.loads(body).get('database') == 'ok', 'API database readiness failed'
+
+          _, body, _ = probe('Python service ready', python_ai + '/health')
+          assert isinstance(json.loads(body), dict), 'Python health response is not JSON object'
+
+          _, body, _ = probe('Frontend HTML', frontend + '/')
+          assert b'<html' in body.lower(), 'Frontend did not return HTML'
+
+          probe('Unauthorized workspace rejected', backend + '/workspace', acceptable=(401,))
+
+          _, _, headers = probe(
+              'Frontend CORS preflight',
+              backend + '/ai/interpret',
+              method='OPTIONS',
+              headers={
+                  'Origin': frontend,
+                  'Access-Control-Request-Method': 'POST',
+                  'Access-Control-Request-Headers': 'authorization,content-type'
+              },
+              acceptable=(200,204)
+          )
+          actual_origin = headers.get('Access-Control-Allow-Origin', '')
+          assert actual_origin == frontend, (
+              f'CORS mismatch: expected {frontend}, got {actual_origin!r}'
+          )
+          print('PASS production read-only smoke checks')
+          PY
       # Do not upload .env, auth state, browser traces or request logs.
